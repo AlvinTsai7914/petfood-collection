@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg:         #ffffff;
+    --color-surface:    #fafafa;
+    --color-border:     #e5e5e5;
+    --color-divider:    #f5f5f5;
+    --color-text-mute:  #a3a3a3;
+    --color-text-sub:   #525252;
+    --color-text:       #171717;
+
+    --color-accent:     #f97316;
+    --color-accent-sec: #14b8a6;
+    --color-accent-ter: #7c3aed;
+    --color-danger:     #dc2626;
+  }
+
+  html, body, #__nuxt {
+    height: 100%;
+  }
+
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html {
+    font-family: 'Inter', 'Noto Sans TC', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    font-feature-settings: 'tnum' on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body { @apply text-body; }
+  h1   { @apply text-h1; }
+  h2   { @apply text-h2; }
+  h3   { @apply text-h3; }
+}
+
+@layer utilities {
+  .accent-bar-primary   { border-left: 2px solid var(--color-accent);     padding-left: 0.5rem; }
+  .accent-bar-secondary { border-left: 2px solid var(--color-accent-sec); padding-left: 0.5rem; }
+  .hairline-b           { border-bottom: 1px solid var(--color-divider); }
+  .hairline-t           { border-top:    1px solid var(--color-divider); }
+}
