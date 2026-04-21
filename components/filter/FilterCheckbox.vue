@@ -10,13 +10,13 @@ defineEmits<{ 'update:modelValue': [v: boolean] }>()
 
 <template>
   <label
-    class="group flex cursor-pointer select-none items-center gap-2.5 py-1 text-small text-neutral-700 hover:text-neutral-900"
+    class="group relative flex cursor-pointer select-none items-center gap-2.5 py-1 text-small text-neutral-700 hover:text-neutral-900"
   >
     <input
       type="checkbox"
       :checked="modelValue"
       :value="value"
-      class="peer sr-only"
+      class="peer absolute inset-0 cursor-pointer opacity-0"
       @change="$emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
     <span

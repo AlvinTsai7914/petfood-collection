@@ -1,200 +1,121 @@
 <script setup lang="ts">
 import type { FilterState } from '~/components/filter/FilterSidebar.vue'
 
-const products = [
-  {
-    id: 'prod_001',
-    name: '98% 鮮肉主食罐 雞肉',
-    brand: '汪喵星球',
-    type: 'cat' as const, typeLabel: '貓',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['雞肉'],
-    age: 'all', ageLabel: '全齡',
-    functional: ['腸胃保健'],
-    special: ['無穀'],
-    volume: '165g',
-    price: 89,
-    image: 'https://picsum.photos/seed/p1/600/450',
-    nutrition: { protein: '12%', fat: '5%', carbs: '3%', phosphorus: '125 mg/100kcal', calories: '95 kcal/100g' },
-  },
-  {
-    id: 'prod_002',
-    name: '超鮮嫩雞胸主食罐',
-    brand: '巷弄貓',
-    type: 'cat' as const, typeLabel: '貓',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['雞肉'],
-    age: 'adult', ageLabel: '成貓/成犬',
-    functional: [],
-    special: [],
-    volume: '80g',
-    price: 65,
-    image: 'https://picsum.photos/seed/p2/600/450',
-    nutrition: { protein: '10%', fat: '4%', carbs: '2%', phosphorus: '110 mg/100kcal', calories: '85 kcal/100g' },
-  },
-  {
-    id: 'prod_003',
-    name: '挑嘴貓 牛肉主食罐',
-    brand: '紐崔斯',
-    type: 'cat' as const, typeLabel: '貓',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['牛肉'],
-    age: 'adult', ageLabel: '成貓/成犬',
-    functional: ['泌尿道保健'],
-    special: [],
-    volume: '170g',
-    price: 120,
-    image: 'https://picsum.photos/seed/p3/600/450',
-    nutrition: { protein: '11%', fat: '6%', carbs: '2%', phosphorus: '100 mg/100kcal', calories: '92 kcal/100g' },
-  },
-  {
-    id: 'prod_004',
-    name: '狗狗鮮魚主食罐',
-    brand: '汪喵星球',
-    type: 'dog' as const, typeLabel: '狗',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['魚肉'],
-    age: 'senior', ageLabel: '老貓/老犬',
-    functional: ['腎臟保健', '關節保健'],
-    special: ['低敏'],
-    volume: '200g',
-    price: 135,
-    image: 'https://picsum.photos/seed/p4/600/450',
-    nutrition: { protein: '9%', fat: '4%', carbs: '3%', phosphorus: '80 mg/100kcal', calories: '88 kcal/100g' },
-  },
-  {
-    id: 'prod_005',
-    name: '無穀全齡雞肉主食罐',
-    brand: '巔峰',
-    type: 'cat' as const, typeLabel: '貓',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['雞肉', '火雞'],
-    age: 'all', ageLabel: '全齡',
-    functional: [],
-    special: ['無穀', '低敏'],
-    volume: '170g',
-    price: 180,
-    image: 'https://picsum.photos/seed/p5/600/450',
-    nutrition: { protein: '13%', fat: '7%', carbs: '2%', phosphorus: '130 mg/100kcal', calories: '110 kcal/100g' },
-  },
-  {
-    id: 'prod_006',
-    name: '鹿肉低敏主食罐',
-    brand: 'Ziwi',
-    type: 'dog' as const, typeLabel: '狗',
-    form: 'wet' as const, formLabel: '濕食',
-    flavors: ['鹿肉'],
-    age: 'adult', ageLabel: '成貓/成犬',
-    functional: ['皮膚毛髮'],
-    special: ['無穀', '低敏'],
-    volume: '170g',
-    price: 220,
-    image: 'https://picsum.photos/seed/p6/600/450',
-    nutrition: { protein: '12%', fat: '6%', carbs: '2%', phosphorus: '95 mg/100kcal', calories: '105 kcal/100g' },
-  },
-]
+const route = useRoute()
+const router = useRouter()
 
-const filterOptions = {
-  types: [
-    { value: 'cat', label: '貓' },
-    { value: 'dog', label: '狗' },
-  ],
-  forms: [
-    { value: 'wet', label: '濕食' },
-    { value: 'dry', label: '乾糧' },
-  ],
-  ages: [
-    { value: 'kitten', label: '幼貓/幼犬' },
-    { value: 'adult', label: '成貓/成犬' },
-    { value: 'senior', label: '老貓/老犬' },
-    { value: 'all', label: '全齡' },
-  ],
-  brands: [
-    { value: 'wangmiao', label: '汪喵星球', count: 24 },
-    { value: 'alleycat', label: '巷弄貓', count: 18 },
-    { value: 'nutrience', label: '紐崔斯', count: 15 },
-    { value: 'ziwi', label: '巔峰', count: 12 },
-    { value: 'ziwipeak', label: 'Ziwi', count: 11 },
-    { value: 'schesir', label: 'Schesir', count: 9 },
-    { value: 'almo', label: 'Almo Nature', count: 8 },
-    { value: 'applaws', label: 'Applaws', count: 7 },
-    { value: 'weruva', label: 'Weruva', count: 6 },
-    { value: 'tikicat', label: 'Tiki Cat', count: 5 },
-    { value: 'cesar', label: '西莎', count: 4 },
-    { value: 'hills', label: 'Hill\'s', count: 3 },
-  ],
-  flavors: [
-    { value: 'chicken', label: '雞肉', count: 52 },
-    { value: 'beef', label: '牛肉', count: 28 },
-    { value: 'fish', label: '魚肉', count: 24 },
-    { value: 'tuna', label: '鮪魚', count: 20 },
-    { value: 'turkey', label: '火雞', count: 15 },
-    { value: 'lamb', label: '羊肉', count: 12 },
-    { value: 'duck', label: '鴨肉', count: 10 },
-    { value: 'salmon', label: '鮭魚', count: 9 },
-    { value: 'venison', label: '鹿肉', count: 7 },
-    { value: 'rabbit', label: '兔肉', count: 5 },
-    { value: 'quail', label: '鵪鶉', count: 3 },
-    { value: 'mixed', label: '綜合', count: 18 },
-  ],
-  functional: [
-    { value: 'kidney', label: '腎臟保健' },
-    { value: 'urinary', label: '泌尿道保健' },
-    { value: 'digest', label: '腸胃保健' },
-    { value: 'skin', label: '皮膚毛髮' },
-    { value: 'joint', label: '關節保健' },
-    { value: 'hairball', label: '化毛配方' },
-    { value: 'weight', label: '體重管理' },
-  ],
-  special: [
-    { value: 'grain-free', label: '無穀' },
-    { value: 'hypoallergenic', label: '低敏' },
-  ],
-}
+const FILTER_KEYS = ['type', 'form', 'age', 'brand', 'flavor', 'func', 'special'] as const
 
-const filters = ref<FilterState>({
-  type: [], form: [], age: [], brand: [], flavor: [], func: [], special: [],
+const parseFilters = (q: typeof route.query): FilterState => ({
+  type: q.type ? String(q.type).split(',') : [],
+  form: q.form ? String(q.form).split(',') : [],
+  age: q.age ? String(q.age).split(',') : [],
+  brand: q.brand ? String(q.brand).split(',') : [],
+  flavor: q.flavor ? String(q.flavor).split(',') : [],
+  func: q.func ? String(q.func).split(',') : [],
+  special: q.special ? String(q.special).split(',') : [],
 })
 
+// filters 內存狀態 — 立即響應 UI;URL 是最終真實狀態,經 debounce 同步
+const filters = ref<FilterState>(parseFilters(route.query))
+
+// URL → filters(上一頁/下一頁、書籤)
+let syncingFromUrl = false
+watch(() => route.query, (q) => {
+  syncingFromUrl = true
+  filters.value = parseFilters(q)
+  nextTick(() => { syncingFromUrl = false })
+})
+
+// filters → URL(debounce 300ms,符合 spec 桌機 instant filter 需求)
+let debounceTimer: ReturnType<typeof setTimeout> | undefined
+watch(filters, (f) => {
+  if (syncingFromUrl) return
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    const query: Record<string, string> = {}
+    for (const k of FILTER_KEYS) {
+      const v = f[k]
+      if (v.length) query[k] = v.join(',')
+    }
+    router.replace({ query })
+  }, 300)
+}, { deep: true })
+
+// 抓篩選選項(靜態、1 hr 快取)
+const { data: filtersData } = await useFetch('/api/filters', {
+  key: 'filters',
+  default: () => ({
+    success: true as const,
+    data: {
+      types: [], forms: [], ages: [], brands: [], flavors: [], functional: [], special: [],
+    },
+  }),
+})
+const filterOptions = computed(() => filtersData.value!.data)
+
+// 抓產品(反應式 URL query → 自動 refetch)
+const { data: productsData, pending, error, refresh } = await useFetch('/api/products', {
+  query: computed(() => route.query),
+  default: () => ({
+    success: true as const,
+    data: {
+      products: [],
+      pagination: { page: 1, limit: 24, total: 0, totalPages: 1 },
+    },
+  }),
+})
+const products = computed(() => productsData.value!.data.products)
+const pagination = computed(() => productsData.value!.data.pagination)
+
+// Drawer
+const drawerOpen = ref(false)
+
+const totalSelected = computed(() =>
+  Object.values(filters.value).reduce((s, a) => s + a.length, 0)
+)
+
+// 已選標籤(從 filters + filterOptions 推導顯示用中文 label)
 type FilterKey = keyof FilterState
-
-const cardFieldToFilterKey: Record<string, FilterKey> = {
-  type: 'type',
-  form: 'form',
-  age: 'age',
-  flavor: 'flavor',
-  functional: 'func',
-  special: 'special',
-}
-
-const onCardTagClick = (field: string, value: string) => {
-  const key = cardFieldToFilterKey[field]
-  if (!key) return
-  if (!filters.value[key].includes(value)) {
-    filters.value[key] = [...filters.value[key], value]
-  }
-}
-
-const filterKeyToOptions: Record<FilterKey, Array<{ value: string; label: string }>> = {
-  type: filterOptions.types,
-  form: filterOptions.forms,
-  age: filterOptions.ages,
-  brand: filterOptions.brands,
-  flavor: filterOptions.flavors,
-  func: filterOptions.functional,
-  special: filterOptions.special,
-}
-
 const activeTags = computed(() => {
+  const opts = filterOptions.value
+  const keyToOptions: Record<FilterKey, Array<{ value: string; label: string }>> = {
+    type: opts.types, form: opts.forms, age: opts.ages, brand: opts.brands,
+    flavor: opts.flavors, func: opts.functional, special: opts.special,
+  }
   const rows: { field: FilterKey; value: string; label: string }[] = []
-  for (const key of Object.keys(filters.value) as FilterKey[]) {
+  for (const key of FILTER_KEYS) {
     for (const v of filters.value[key]) {
-      const label = filterKeyToOptions[key].find(o => o.value === v)?.label ?? v
+      const label = keyToOptions[key]?.find(o => o.value === v)?.label ?? v
       rows.push({ field: key, value: v, label })
     }
   }
   return rows
 })
+
+// 卡片上點標籤 → 加入篩選(把 value 或 label 正規化回 slug)
+const cardFieldToFilterKey: Record<string, FilterKey> = {
+  type: 'type', form: 'form', age: 'age',
+  flavor: 'flavor', functional: 'func', special: 'special',
+}
+
+const onCardTagClick = (field: string, value: string) => {
+  const key = cardFieldToFilterKey[field]
+  if (!key) return
+  const opts = filterOptions.value
+  const optList = {
+    type: opts.types, form: opts.forms, age: opts.ages, brand: opts.brands,
+    flavor: opts.flavors, func: opts.functional, special: opts.special,
+  }[key]
+  // 卡片送來的可能是 slug(type/form/age)或中文 label(flavor/func/special)
+  let slug = value
+  if (!optList.find(o => o.value === value)) {
+    slug = optList.find(o => o.label === value)?.value ?? value
+  }
+  if (!filters.value[key].includes(slug)) {
+    filters.value[key] = [...filters.value[key], slug]
+  }
+}
 
 const removeTag = (field: FilterKey, value: string) => {
   filters.value[field] = filters.value[field].filter(v => v !== value)
@@ -204,12 +125,7 @@ const clearAllFilters = () => {
   filters.value = { type: [], form: [], age: [], brand: [], flavor: [], func: [], special: [] }
 }
 
-const drawerOpen = ref(false)
-
-const totalSelected = computed(() =>
-  Object.values(filters.value).reduce((s, a) => s + a.length, 0)
-)
-
+// Header 縮小 scroll 監聽
 const mainRef = ref<HTMLElement>()
 const isScrolled = ref(false)
 
@@ -252,7 +168,7 @@ onBeforeUnmount(() => {
       </aside>
 
       <main ref="mainRef" class="min-w-0 flex-1 overflow-y-auto">
-        <!-- 手機:固定於頂部的篩選入口列(含已選標籤) -->
+        <!-- 手機:sticky 篩選入口 + 已選 -->
         <section class="sticky top-0 z-10 border-b border-neutral-100 bg-white px-6 py-3 md:hidden">
           <div class="flex items-center gap-3">
             <button
@@ -286,7 +202,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- 桌機/平板:sticky 已選標籤列(有選才顯示) -->
+        <!-- 桌機:sticky 已選標籤(有選才顯示) -->
         <section
           v-if="activeTags.length"
           class="sticky top-0 z-10 hidden flex-wrap items-center gap-2 border-b border-neutral-100 bg-white px-6 py-3 text-small md:flex"
@@ -307,15 +223,47 @@ onBeforeUnmount(() => {
           >
             清除全部
           </button>
+          <span class="ml-auto font-mono text-caption tabular-nums text-neutral-400">
+            共 {{ pagination.total }} 筆 · 第 {{ pagination.page }} / {{ pagination.totalPages }} 頁
+          </span>
         </section>
 
-        <section class="grid grid-cols-1 gap-6 px-6 py-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          <ProductCard
-            v-for="product in products"
-            :key="product.id"
-            :product="product"
-            @tag-click="onCardTagClick"
+        <!-- 主內容區:Loading / Error / Empty / Grid -->
+        <section class="px-6 py-6">
+          <!-- Loading:骨架 -->
+          <div
+            v-if="pending && products.length === 0"
+            class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+          >
+            <UiProductSkeleton v-for="n in 8" :key="n" />
+          </div>
+
+          <!-- Error -->
+          <UiErrorState
+            v-else-if="error"
+            :message="error.message"
+            @retry="refresh"
           />
+
+          <!-- Empty -->
+          <UiEmptyState
+            v-else-if="products.length === 0"
+            @clear="clearAllFilters"
+          />
+
+          <!-- Grid(切篩選時,保留舊資料 + 淡化;spec 要求) -->
+          <div
+            v-else
+            class="grid grid-cols-1 gap-6 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+            :class="{ 'opacity-50': pending }"
+          >
+            <ProductCard
+              v-for="product in products"
+              :key="product.id"
+              :product="product"
+              @tag-click="onCardTagClick"
+            />
+          </div>
         </section>
       </main>
     </div>

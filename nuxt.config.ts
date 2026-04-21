@@ -9,7 +9,7 @@ export default defineNuxtConfig({
     preference: 'light',
     fallback: 'light',
   },
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   app: {
     head: {
       title: '寵物食品產品資料庫',
