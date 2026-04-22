@@ -93,46 +93,34 @@ const PRODUCTS: MockProduct[] = [
 
 const count = (pred: (p: MockProduct) => boolean) => PRODUCTS.filter(pred).length
 
+const buildOptions = (
+  labels: Record<string, string>,
+  matches: (p: MockProduct, value: string) => boolean,
+) => Object.entries(labels).map(([value, label]) => ({
+  value, label, count: count(p => matches(p, value)),
+}))
+
 const FILTER_OPTIONS = {
-  types: [
-    { value: 'cat', label: '貓', count: count(p => p.type === 'cat') },
-    { value: 'dog', label: '狗', count: count(p => p.type === 'dog') },
-  ],
-  forms: [
-    { value: 'wet', label: '濕食', count: count(p => p.form === 'wet') },
-    { value: 'dry', label: '乾糧', count: count(p => p.form === 'dry') },
-  ],
-  ages: [
-    { value: 'kitten', label: '幼貓/幼犬', count: count(p => p.age === 'kitten') },
-    { value: 'adult', label: '成貓/成犬', count: count(p => p.age === 'adult') },
-    { value: 'senior', label: '老貓/老犬', count: count(p => p.age === 'senior') },
-    { value: 'all', label: '全齡', count: count(p => p.age === 'all') },
-  ],
-  brands: Object.entries(BRAND_LABELS).map(([value, label]) => ({
-    value, label, count: count(p => p.brand === value),
-  })),
-  flavors: Object.entries(FLAVOR_LABELS).map(([value, label]) => ({
-    value, label, count: count(p => p.flavors.includes(value)),
-  })),
-  functional: Object.entries(FUNCTIONAL_LABELS).map(([value, label]) => ({
-    value, label, count: count(p => p.functional.includes(value)),
-  })),
-  special: Object.entries(SPECIAL_LABELS).map(([value, label]) => ({
-    value, label, count: count(p => p.special.includes(value)),
-  })),
+  types: buildOptions(TYPE_LABELS, (p, v) => p.type === v),
+  forms: buildOptions(FORM_LABELS, (p, v) => p.form === v),
+  ages: buildOptions(AGE_LABELS, (p, v) => p.age === v),
+  brands: buildOptions(BRAND_LABELS, (p, v) => p.brand === v),
+  flavors: buildOptions(FLAVOR_LABELS, (p, v) => p.flavors.includes(v)),
+  functional: buildOptions(FUNCTIONAL_LABELS, (p, v) => p.functional.includes(v)),
+  special: buildOptions(SPECIAL_LABELS, (p, v) => p.special.includes(v)),
 }
 
 export const getFilterOptions = () => FILTER_OPTIONS
 
+const arr = (v: unknown): string[] => {
+  if (!v) return []
+  if (Array.isArray(v)) return v.map(String)
+  return String(v).split(',').filter(Boolean)
+}
+
 export const queryProducts = (query: Record<string, unknown>) => {
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.max(1, Math.min(100, Number(query.limit) || 24))
-
-  const arr = (v: unknown): string[] => {
-    if (!v) return []
-    if (Array.isArray(v)) return v.map(String)
-    return String(v).split(',').filter(Boolean)
-  }
 
   const types = arr(query.type)
   const forms = arr(query.form)

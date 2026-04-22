@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { FilterState } from '~/utils/filter-state'
+
 interface Option {
   value: string
   label: string
@@ -15,16 +17,6 @@ interface FilterOptions {
   special: Option[]
 }
 
-export interface FilterState {
-  type: string[]
-  form: string[]
-  age: string[]
-  brand: string[]
-  flavor: string[]
-  func: string[]
-  special: string[]
-}
-
 const props = defineProps<{
   filterOptions: FilterOptions
   modelValue: FilterState
@@ -36,15 +28,9 @@ const update = <K extends keyof FilterState>(key: K, v: string[]) => {
   emit('update:modelValue', { ...props.modelValue, [key]: v })
 }
 
-const clearAll = () => {
-  emit('update:modelValue', {
-    type: [], form: [], age: [], brand: [], flavor: [], func: [], special: [],
-  })
-}
+const clearAll = () => emit('update:modelValue', emptyFilterState())
 
-const totalSelected = computed(() =>
-  Object.values(props.modelValue).reduce((sum, arr) => sum + arr.length, 0)
-)
+const totalSelected = computed(() => countSelected(props.modelValue))
 
 const groups = computed(() => [
   { key: 'type' as const, title: '類型', options: props.filterOptions.types },

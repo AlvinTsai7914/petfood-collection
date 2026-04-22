@@ -1,29 +1,17 @@
 <script setup lang="ts">
-import type { FilterState } from '~/components/filter/FilterSidebar.vue'
+import type { FilterKey, FilterState } from '~/utils/filter-state'
 
 const route = useRoute()
 const router = useRouter()
 
-const FILTER_KEYS = ['type', 'form', 'age', 'brand', 'flavor', 'func', 'special'] as const
-
-const parseFilters = (q: typeof route.query): FilterState => ({
-  type: q.type ? String(q.type).split(',') : [],
-  form: q.form ? String(q.form).split(',') : [],
-  age: q.age ? String(q.age).split(',') : [],
-  brand: q.brand ? String(q.brand).split(',') : [],
-  flavor: q.flavor ? String(q.flavor).split(',') : [],
-  func: q.func ? String(q.func).split(',') : [],
-  special: q.special ? String(q.special).split(',') : [],
-})
-
 // filters 內存狀態 — 立即響應 UI;URL 是最終真實狀態,經 debounce 同步
-const filters = ref<FilterState>(parseFilters(route.query))
+const filters = ref<FilterState>(parseFilterQuery(route.query))
 
 // URL → filters(上一頁/下一頁、書籤)
 let syncingFromUrl = false
 watch(() => route.query, (q) => {
   syncingFromUrl = true
-  filters.value = parseFilters(q)
+  filters.value = parseFilterQuery(q)
   nextTick(() => { syncingFromUrl = false })
 })
 
@@ -35,8 +23,7 @@ watch(filters, (f) => {
   debounceTimer = setTimeout(() => {
     const query: Record<string, string> = {}
     for (const k of FILTER_KEYS) {
-      const v = f[k]
-      if (v.length) query[k] = v.join(',')
+      if (f[k].length) query[k] = f[k].join(',')
     }
     router.replace({ query })
   }, 300)
@@ -54,9 +41,21 @@ const { data: filtersData } = await useFetch('/api/filters', {
 })
 const filterOptions = computed(() => filtersData.value!.data)
 
+// 只把 filter/pagination 相關 query 傳給 useFetch,避免 hash 等無關 query 變動觸發 refetch
+const productsQuery = computed(() => {
+  const out: Record<string, string> = {}
+  for (const k of FILTER_KEYS) {
+    const v = route.query[k]
+    if (v) out[k] = String(v)
+  }
+  if (route.query.page) out.page = String(route.query.page)
+  if (route.query.limit) out.limit = String(route.query.limit)
+  return out
+})
+
 // 抓產品(反應式 URL query → 自動 refetch)
 const { data: productsData, pending, error, refresh } = await useFetch('/api/products', {
-  query: computed(() => route.query),
+  query: productsQuery,
   default: () => ({
     success: true as const,
     data: {
@@ -71,22 +70,22 @@ const pagination = computed(() => productsData.value!.data.pagination)
 // Drawer
 const drawerOpen = ref(false)
 
-const totalSelected = computed(() =>
-  Object.values(filters.value).reduce((s, a) => s + a.length, 0)
-)
+const totalSelected = computed(() => countSelected(filters.value))
+
+const optionsByKey = computed<Record<FilterKey, Array<{ value: string; label: string }>>>(() => {
+  const o = filterOptions.value
+  return {
+    type: o.types, form: o.forms, age: o.ages, brand: o.brands,
+    flavor: o.flavors, func: o.functional, special: o.special,
+  }
+})
 
 // 已選標籤(從 filters + filterOptions 推導顯示用中文 label)
-type FilterKey = keyof FilterState
 const activeTags = computed(() => {
-  const opts = filterOptions.value
-  const keyToOptions: Record<FilterKey, Array<{ value: string; label: string }>> = {
-    type: opts.types, form: opts.forms, age: opts.ages, brand: opts.brands,
-    flavor: opts.flavors, func: opts.functional, special: opts.special,
-  }
   const rows: { field: FilterKey; value: string; label: string }[] = []
   for (const key of FILTER_KEYS) {
     for (const v of filters.value[key]) {
-      const label = keyToOptions[key]?.find(o => o.value === v)?.label ?? v
+      const label = optionsByKey.value[key]?.find(o => o.value === v)?.label ?? v
       rows.push({ field: key, value: v, label })
     }
   }
@@ -102,16 +101,11 @@ const cardFieldToFilterKey: Record<string, FilterKey> = {
 const onCardTagClick = (field: string, value: string) => {
   const key = cardFieldToFilterKey[field]
   if (!key) return
-  const opts = filterOptions.value
-  const optList = {
-    type: opts.types, form: opts.forms, age: opts.ages, brand: opts.brands,
-    flavor: opts.flavors, func: opts.functional, special: opts.special,
-  }[key]
-  // 卡片送來的可能是 slug(type/form/age)或中文 label(flavor/func/special)
-  let slug = value
-  if (!optList.find(o => o.value === value)) {
-    slug = optList.find(o => o.label === value)?.value ?? value
-  }
+  const list = optionsByKey.value[key]
+  // type/form/age 由卡片帶出 slug,flavor/func/special 帶出中文 label;兩種都正規化回 slug
+  const slug = list.find(o => o.value === value)?.value
+    ?? list.find(o => o.label === value)?.value
+    ?? value
   if (!filters.value[key].includes(slug)) {
     filters.value[key] = [...filters.value[key], slug]
   }
@@ -122,7 +116,7 @@ const removeTag = (field: FilterKey, value: string) => {
 }
 
 const clearAllFilters = () => {
-  filters.value = { type: [], form: [], age: [], brand: [], flavor: [], func: [], special: [] }
+  filters.value = emptyFilterState()
 }
 
 // Header 縮小 scroll 監聽
@@ -139,6 +133,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   mainRef.value?.removeEventListener('scroll', handleScroll)
+  clearTimeout(debounceTimer)
 })
 </script>
 
@@ -163,12 +158,13 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <aside class="hidden w-64 flex-none overflow-y-auto md:block">
-        <FilterSidebar v-model="filters" :filter-options="filterOptions" />
-      </aside>
+      <FilterSidebar
+        v-model="filters"
+        :filter-options="filterOptions"
+        class="hidden w-64 flex-none overflow-y-auto md:block"
+      />
 
       <main ref="mainRef" class="min-w-0 flex-1 overflow-y-auto">
-        <!-- 手機:sticky 篩選入口 + 已選 -->
         <section class="sticky top-0 z-10 border-b border-neutral-100 bg-white px-6 py-3 md:hidden">
           <div class="flex items-center gap-3">
             <button
@@ -202,7 +198,6 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- 桌機:sticky 已選標籤(有選才顯示) -->
         <section
           v-if="activeTags.length"
           class="sticky top-0 z-10 hidden flex-wrap items-center gap-2 border-b border-neutral-100 bg-white px-6 py-3 text-small md:flex"
@@ -228,9 +223,7 @@ onBeforeUnmount(() => {
           </span>
         </section>
 
-        <!-- 主內容區:Loading / Error / Empty / Grid -->
         <section class="px-6 py-6">
-          <!-- Loading:骨架 -->
           <div
             v-if="pending && products.length === 0"
             class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
@@ -238,20 +231,17 @@ onBeforeUnmount(() => {
             <UiProductSkeleton v-for="n in 8" :key="n" />
           </div>
 
-          <!-- Error -->
           <UiErrorState
             v-else-if="error"
             :message="error.message"
             @retry="refresh"
           />
 
-          <!-- Empty -->
           <UiEmptyState
             v-else-if="products.length === 0"
             @clear="clearAllFilters"
           />
 
-          <!-- Grid(切篩選時,保留舊資料 + 淡化;spec 要求) -->
           <div
             v-else
             class="grid grid-cols-1 gap-6 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"

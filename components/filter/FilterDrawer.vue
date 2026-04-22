@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { FilterState } from '~/utils/filter-state'
+
 interface Option {
   value: string
   label: string
@@ -15,16 +17,6 @@ interface FilterOptions {
   special: Option[]
 }
 
-interface FilterState {
-  type: string[]
-  form: string[]
-  age: string[]
-  brand: string[]
-  flavor: string[]
-  func: string[]
-  special: string[]
-}
-
 const props = defineProps<{
   open: boolean
   filterOptions: FilterOptions
@@ -36,16 +28,11 @@ const emit = defineEmits<{
   'update:modelValue': [v: FilterState]
 }>()
 
-const cloneState = (s: FilterState): FilterState => ({
-  type: [...s.type], form: [...s.form], age: [...s.age],
-  brand: [...s.brand], flavor: [...s.flavor], func: [...s.func], special: [...s.special],
-})
+const staging = ref<FilterState>(cloneFilterState(props.modelValue))
 
-const staging = ref<FilterState>(cloneState(props.modelValue))
-
-// 開啟時把目前已套用狀態複製進 staging (放棄上次未套用的編輯)
+// 開啟時把目前已套用狀態複製進 staging(放棄上次未套用的編輯)
 watch(() => props.open, (o) => {
-  if (o) staging.value = cloneState(props.modelValue)
+  if (o) staging.value = cloneFilterState(props.modelValue)
 })
 
 const update = <K extends keyof FilterState>(key: K, v: string[]) => {
@@ -58,12 +45,10 @@ const apply = () => {
   close()
 }
 const clearLocal = () => {
-  staging.value = { type: [], form: [], age: [], brand: [], flavor: [], func: [], special: [] }
+  staging.value = emptyFilterState()
 }
 
-const stagingCount = computed(() =>
-  Object.values(staging.value).reduce((s, a) => s + a.length, 0)
-)
+const stagingCount = computed(() => countSelected(staging.value))
 
 const groups = computed(() => [
   { key: 'type' as const, title: '類型', options: props.filterOptions.types },
