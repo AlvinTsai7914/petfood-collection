@@ -1,10 +1,10 @@
 <script setup lang="ts">
 interface Nutrition {
-  protein: string
-  fat: string
-  carbs: string
-  phosphorus: string
-  calories: string
+  protein: string | null
+  fat: string | null
+  carbs: string | null
+  phosphorus: string | null
+  calories: string | null
 }
 
 interface Product {
@@ -20,9 +20,9 @@ interface Product {
   ageLabel: string
   functional: string[]
   special: string[]
-  volume: string
-  price: number
-  image: string
+  volume: string | null
+  price: number | null
+  image: string | null
   nutrition: Nutrition
 }
 
@@ -32,7 +32,8 @@ const emit = defineEmits<{
   (e: 'tag-click', field: string, value: string, label: string): void
 }>()
 
-const splitUnit = (v: string) => {
+const splitUnit = (v: string | null | undefined) => {
+  if (!v) return { value: '—', unit: '' }
   const m = v.match(/^([\d.]+)\s*(.*)$/)
   return m ? { value: m[1], unit: m[2] } : { value: v, unit: '' }
 }
@@ -53,9 +54,10 @@ const macroRows = computed(() => {
     const m = s.match(/^([\d.]+)/)
     return m ? parseFloat(m[1]) : 0
   }
-  const mk = (label: string, raw: string, color: string) => {
+  const mk = (label: string, raw: string | null, color: string) => {
+    if (!raw) return { label, value: '—', bar: 0, color }
     const v = num(raw)
-    return { label, value: v, bar: Math.min(100, (v / max) * 100), color }
+    return { label, value: String(v), bar: Math.min(100, (v / max) * 100), color }
   }
   return [
     mk('蛋白質', n.protein, 'bg-accent-primary'),
@@ -88,9 +90,9 @@ const productCode = computed(() =>
   props.product.id.replace(/^prod_/i, 'PROD-').toUpperCase()
 )
 
-const onImageError = (e: Event) => {
-  const img = e.target as HTMLImageElement
-  img.src = '/default-product.png'
+const imageErrored = ref(false)
+const onImageError = () => {
+  imageErrored.value = true
 }
 </script>
 
@@ -98,12 +100,16 @@ const onImageError = (e: Event) => {
   <article class="group flex flex-col border border-neutral-200 bg-white transition-colors hover:border-neutral-400">
     <div class="aspect-[3/1] overflow-hidden bg-neutral-50">
       <img
+        v-if="product.image && !imageErrored"
         :src="product.image"
         :alt="product.name"
         class="h-full w-full object-cover"
         loading="lazy"
         @error="onImageError"
       />
+      <div v-else class="flex h-full w-full items-center justify-center">
+        <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
+      </div>
     </div>
 
     <div class="flex flex-1 flex-col gap-2 px-3 py-2.5 md:gap-2.5 md:px-4 md:py-3">
@@ -192,7 +198,7 @@ const onImageError = (e: Event) => {
               <div class="h-full" :class="row.color" :style="{ width: row.bar + '%' }" />
             </div>
             <dd class="text-right font-mono text-small tabular-nums text-neutral-900">
-              {{ row.value }}<span class="text-neutral-400">%</span>
+              {{ row.value }}<span v-if="row.value !== '—'" class="text-neutral-400">%</span>
             </dd>
           </div>
         </dl>
@@ -206,15 +212,15 @@ const onImageError = (e: Event) => {
         >
           <dt class="text-caption text-neutral-500">{{ row.label }}</dt>
           <dd class="font-mono text-small tabular-nums text-neutral-900">
-            {{ row.value }}<span class="ml-1 text-[10px] text-neutral-400">{{ row.unit }}</span>
+            {{ row.value }}<span v-if="row.unit" class="ml-1 text-[10px] text-neutral-400">{{ row.unit }}</span>
           </dd>
         </div>
       </dl>
 
       <footer class="mt-auto flex items-baseline justify-between border-t border-neutral-100 pt-2 md:pt-2.5">
-        <span class="font-mono text-small tabular-nums text-neutral-400">{{ product.volume }}</span>
+        <span class="font-mono text-small tabular-nums text-neutral-400">{{ product.volume ?? '—' }}</span>
         <span class="font-mono text-h2 font-semibold tabular-nums text-accent">
-          <span class="mr-1 font-sans text-small font-normal text-neutral-400">NT$</span>{{ product.price }}
+          <span class="mr-1 font-sans text-small font-normal text-neutral-400">NT$</span>{{ product.price ?? '—' }}
         </span>
       </footer>
     </div>
