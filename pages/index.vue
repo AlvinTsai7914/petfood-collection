@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { FilterKey, FilterState } from '~/utils/filter-state'
 
+// 首頁有自己的 full-height flex + 獨立 scrollbar + header 縮放,不套 default layout
+definePageMeta({ layout: false })
+
 const route = useRoute()
 const router = useRouter()
 
@@ -148,23 +151,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex h-full flex-col bg-white">
-    <header
-      class="flex-none border-b border-neutral-100 transition-all duration-200 ease-out"
-      :class="isScrolled ? 'py-2' : 'py-5'"
-    >
-      <div class="flex items-center justify-between px-6">
-        <h1
-          class="tracking-tight transition-all duration-200 ease-out"
-          :class="isScrolled ? 'text-small font-medium' : 'text-h3'"
-        >
-          寵物食品資料庫
-        </h1>
-        <nav class="flex gap-6 text-small text-neutral-600">
-          <a href="#" class="hover:text-neutral-900">關於我們</a>
-          <a href="#" class="hover:text-neutral-900">聯絡方式</a>
-        </nav>
-      </div>
-    </header>
+    <LayoutAppHeader :compact="isScrolled" />
 
     <div class="flex min-h-0 flex-1">
       <FilterSidebar
@@ -194,16 +181,13 @@ onBeforeUnmount(() => {
               清除
             </button>
           </div>
-          <div v-if="activeTags.length" class="mt-2 flex flex-wrap items-center gap-2 text-small">
-            <button
+          <div v-if="activeTags.length" class="mt-2 flex flex-wrap items-center gap-2">
+            <FilterActiveTag
               v-for="tag in activeTags"
               :key="tag.field + tag.value"
-              class="group flex items-center gap-2 border border-neutral-300 px-2 py-1 hover:border-accent"
-              @click="removeTag(tag.field, tag.value)"
-            >
-              <span>{{ tag.label }}</span>
-              <span class="text-neutral-400 group-hover:text-accent">✕</span>
-            </button>
+              :label="tag.label"
+              @remove="removeTag(tag.field, tag.value)"
+            />
           </div>
         </section>
 
@@ -212,15 +196,12 @@ onBeforeUnmount(() => {
           class="sticky top-0 z-10 hidden flex-wrap items-center gap-2 border-b border-neutral-100 bg-white px-6 py-3 text-small md:flex"
         >
           <span class="text-neutral-400">已選:</span>
-          <button
+          <FilterActiveTag
             v-for="tag in activeTags"
             :key="tag.field + tag.value"
-            class="group flex items-center gap-2 border border-neutral-300 px-2 py-1 hover:border-accent"
-            @click="removeTag(tag.field, tag.value)"
-          >
-            <span>{{ tag.label }}</span>
-            <span class="text-neutral-400 group-hover:text-accent">✕</span>
-          </button>
+            :label="tag.label"
+            @remove="removeTag(tag.field, tag.value)"
+          />
           <button
             class="ml-2 text-neutral-400 underline underline-offset-2 hover:text-neutral-900"
             @click="clearAllFilters"
