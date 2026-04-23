@@ -119,6 +119,15 @@ const clearAllFilters = () => {
   filters.value = emptyFilterState()
 }
 
+// 換頁:寫回 URL + 把 main 捲到頂;page=1 不放進 URL 保持網址乾淨
+const onPageChange = (pg: number) => {
+  const query = { ...route.query }
+  if (pg > 1) query.page = String(pg)
+  else delete query.page
+  router.push({ query })
+  mainRef.value?.scrollTo({ top: 0 })
+}
+
 // Header 縮小 scroll 監聽
 const mainRef = ref<HTMLElement>()
 const isScrolled = ref(false)
@@ -254,6 +263,12 @@ onBeforeUnmount(() => {
               @tag-click="onCardTagClick"
             />
           </div>
+
+          <UiPagination
+            :page="pagination.page"
+            :total-pages="pagination.totalPages"
+            @change="onPageChange"
+          />
         </section>
       </main>
     </div>
