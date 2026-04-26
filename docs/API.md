@@ -444,9 +444,105 @@ diff <(curl -s "http://localhost:3000/api/products?type=cat" | jq -S .) \
 
 ---
 
+## 10. Backend 對齊清單(2026-04-26)
+
+實際抓 https://feedradar-production.up.railway.app/api/products 後比對契約,發現以下差異與待辦。**請後端依優先度處理**。
+
+### 10.1 已發現的契約落差
+
+| 欄位 | 契約定義 | 後端實際回傳 | 影響 | 修正方向 |
+|------|---------|-------------|------|---------|
+| `id` | `prod_XXX` 字串 | 整數(283、279、1) | 前端的 `PROD-XXX` 顯示與 URL 路徑會錯 | **改契約配合後端用整數**(後端改 DB 風險高);前端顯示改成 `#283` 或 `PROD-283` |
+| `flavor`(單數) | 不應存在 | **單一字串塞滿成分表**(雞肉粉、大麥、燕麥...) | 把成分當口味,首頁的口味篩選失效 | **正名 `flavor` → `ingredients`**,並新增正確的 `flavors: string[]` 分類欄位 |
+| `flavors[]` | 中文 label 陣列 | 不存在 | 口味篩選沒資料可比對 | 後端從成分判斷主食材(關鍵字含「雞」→ `chicken`)寫入此欄 |
+| `functional[]` | 中文 label 陣列 | `[]` 全空 | 機能配方篩選沒結果 | 後端爬蟲補上分類 |
+| `special[]` | **中文 label** 陣列(如 `["低敏"]`) | **回 slug**(`["hypoallergenic"]`) | 前端會直接顯示英文 slug 給使用者看 | 後端統一回中文 label;或前端自己做 slug→label 轉譯(過渡方案) |
+| `nutrition.*` | 含單位字串或 null | 大量 null,只有部分 protein/fat 有 | macro bars 多數產品空白 | 持續補齊;null 是合法回應 |
+| `volume` | `"2kg"` 純規格 | `"2kg(需預訂)"` 混雜備貨狀態 | 前端把備貨字樣當容量顯示 | 後端拆分:`volume: "2kg"` + 新欄位 `availability: "預訂中" \| "現貨"` 等 |
+| `image` | 完整 URL 或 null | 全部 null | 全站 NO IMAGE | 圖片爬蟲還沒實作,催 |
+
+### 10.2 必修(🔴 ship-blocking)
+
+1. **`flavor` 正名為 `ingredients` + 新增 `flavors[]` 分類** — 不修則口味篩選永遠空,使用者體驗壞掉。
+2. **`special` / `functional` 統一回中文 label**(若後端要等,前端可先做 slug→label 轉譯做過渡)。
+3. **`id` 型別對齊** — 契約改成 `integer`(配合後端);前端用 `#283` 或 `PROD-283` 顯示風格不變。
+
+### 10.3 應修(🟡 影響體驗但不擋上線)
+
+4. **圖片爬蟲開工** — Phase 1 圖片資訊是核心體驗,空圖時間越長使用者越無感。
+5. **`volume` 正規化** — 拆出 `availability` 欄位,或後端先把括號內容拿掉(前端現可暫用 regex 過濾)。
+6. **完整營養成分** — `phosphorus` / `calories` / `carbs` 多數 null,有資料才能跑 macro bars + 腎貓篩選。
+
+---
+
+## 11. 詳情頁支援(Phase 1 範圍擴大,2026-04-26)
+
+⚠️ **背景**:Spec §14 原本將「產品詳情頁」列為 Phase 1 暫不實作。專案決定提前做(2026-04-26),以下為新增需求。
+
+### 11.1 新端點
+
+```
+GET /api/products/{id}
+```
+
+回單一產品完整資料。Response shape 同 §4 的 `products[]` 內元素 + 詳情擴展欄位(見下)。
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 283,
+    "name": "...",
+    "brand": "...",
+    // ... 同列表回傳的所有欄位 ...
+    "ingredients": ["雞肉粉", "大麥", "燕麥", "..."],
+    "feedingGuide": [
+      { "weightRange": "5-10kg", "dailyAmount": "85-150g" }
+    ],
+    "origin": "加拿大製造",
+    "guaranteedAnalysis": {
+      "protein": "27%",
+      "fat": "16%",
+      "fiber": "4%",
+      "ash": "8%",
+      "moisture": "10%",
+      "calcium": "1.2%",
+      "phosphorus": "0.9%"
+    },
+    "images": ["https://...", "https://..."],
+    "sourceUrl": "https://www.brand-website.com/product/xxx"
+  }
+}
+```
+
+### 11.2 詳情頁新增欄位請求(後端優先度)
+
+| 欄位 | 型別 | 用途 | 優先度 |
+|------|------|------|-------|
+| `ingredients` | `string[]` | 成分陣列(把現在塞在 `flavor` 的字串拆成陣列);詳情頁的成分區塊核心 | **🔴 最高**(本來就有,只是放錯欄位) |
+| `images` | `string[]` | 多張圖(主圖、包裝反面、成分照),首張當卡片預覽圖。**取代 `image: string \| null`**,向後相容請保留 `image` 為 `images[0]` | 🟡 高 |
+| `feedingGuide` | `Array<{ weightRange: string, dailyAmount: string }>` | 餵食建議(體重對應份量);包裝上多半有 | 🟡 中 |
+| `origin` | `string \| null` | 原產地(「加拿大製造」、「泰國包裝」) | 🟢 低 |
+| `guaranteedAnalysis` | `Record<string, string>` | 完整保證分析(超過 §4 列的 5 欄;乾糧 label 有灰分、纖維、鈣鎂) | 🟢 低 |
+| `sourceUrl` | `string \| null` | 原始爬蟲頁面連結;讓使用者跳回官網查看 | 🟢 低 |
+
+### 11.3 列表頁也需要的微調
+
+- `images: string[]`(取代 `image`)— 詳情頁是多圖,列表頁取 `images[0]`,後端爬蟲統一處理較合理
+- 其他列表頁不需要詳情擴展欄位(`ingredients` / `feedingGuide` / 等)— 為節省 payload,**列表 API 不應回這些**,只在 `GET /api/products/{id}` 才完整回
+
+### 11.4 SEO 相關
+
+詳情頁是重要 SEO landing page,後端請考慮:
+- `slug` 欄位(用於 URL 友善,如 `/products/283-1stchoice-chicken-adult-dog-food`)— 否則只能用 `/products/283`,SEO 不友善
+- 各產品的 canonical URL 一致性
+
+---
+
 ## 9. 變更紀錄
 
 | 日期 | 版本 | 變更 |
 |------|------|------|
 | 2026-04-22 | v1.0 | 首版,對齊 spec v1.7 + 前端 mock 當前實作 |
 | 2026-04-22 | v1.1 | 補 id / price / volume / image / nutrition 的 schema 細節;新增 Null / 空值契約;§5 加 slug 治理原則(後端 DB 為權威、append-only、`age=all` 語意) |
+| 2026-04-26 | v1.2 | §10 對比 live backend 後新增「對齊清單」,標記 8 個契約落差(`flavor` 誤用、`id` 型別、`special` 回 slug、images 全空等);§11 新增詳情頁支援(`GET /api/products/{id}` + `ingredients` / `images[]` / `feedingGuide` / `origin` / `sourceUrl` 等欄位) |
