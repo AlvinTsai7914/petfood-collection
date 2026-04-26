@@ -112,24 +112,58 @@ components/
   ui/        — Pagination, LoadingSpinner, EmptyState, ErrorState
 ```
 
-### Current implementation status (as of 2026-04-21)
+### Current implementation status (as of 2026-04-27)
 
-Built and runnable via `npm run dev`:
+**Built and runnable via `npm run dev`:**
+
+Foundation
 - `tailwind.config.ts` — color / font / type-scale / radius=0 / spacing tokens
 - `app.config.ts` — Nuxt UI theme override (primary=orange, gray=neutral, all components `rounded-none`)
-- `assets/css/main.css` — font imports, CSS variables, `accent-bar-*` utilities, global tabular-nums
-- `components/product/ProductCard.vue` — full card with ID header, meta row, functional/special tag bars, 3-color macro bars, phosphorus/calories rows, price footer
-- `pages/index.vue` — demo grid (1/2/3/4 col responsive), inline active-tags bar, mock product data with picsum images
-- `nuxt.config.ts` / `app.vue` / `tsconfig.json` / `.gitignore` / `package.json`
+- `assets/css/main.css` — font imports, CSS variables, `accent-bar-*` utilities, global tabular-nums, body overflow lock
+- `utils/filter-state.ts` — shared `FILTER_KEYS` / `FilterState` type / `emptyFilterState` / `cloneFilterState` / `countSelected` / `parseFilterQuery` (auto-imported)
 
-Not yet built (priority order):
-1. FilterSidebar / FilterGroup / FilterCheckbox (desktop filter)
-2. ActiveTags extracted into its own component
-3. Pagination
-4. Mock API (Nuxt server routes) — `/api/products`, `/api/filters`
-5. FilterDrawer (mobile)
-6. EmptyState / ErrorState / Skeleton
-7. AppHeader / AppFooter + static pages (about / contact / privacy / 404)
+Server (mock)
+- `server/utils/catalog.ts` — 30 mock products + label maps + `buildOptions` + `queryProducts` (filter/paginate)
+- `server/api/filters.get.ts` — returns spec §5.4 filter options with global counts
+- `server/api/products.get.ts` — server-side filtering + pagination + slug→label transform per §5.3
+
+Layout / app shell
+- `app.vue` — `<NuxtLayout><NuxtPage /></NuxtLayout>` mount
+- `layouts/default.vue` — sticky-footer pattern wrapping AppHeader + slot + AppFooter (used by static pages)
+- `components/layout/AppHeader.vue` — `compact` prop drives the scroll-shrink state; uses NuxtLink (auto-import name: `<LayoutAppHeader>`)
+- `components/layout/AppFooter.vue` — logotype + version + nav + spec §9.4 disclaimer (auto-import name: `<LayoutAppFooter>`)
+
+Product listing
+- `pages/index.vue` — opts out of default layout via `definePageMeta({ layout: false })`; full-height flex with independent sidebar/main scrollbars; URL-driven filter state with 300ms debounce; sticky shrinking header
+- `components/product/ProductCard.vue` — full card with ID header, meta row, functional/special tag bars, 3-color macro bars (form-aware MACRO_MAX), phosphorus/calories rows, price footer; **null-safe**: handles `null` for price, volume, image, and any nutrition field per the API contract
+
+Filters
+- `components/filter/FilterCheckbox.vue` — accessible custom checkbox using absolute-overlay pattern (avoids sr-only focus-scroll bug)
+- `components/filter/FilterGroup.vue` — single filter category with `>10` show-more toggle
+- `components/filter/FilterSidebar.vue` — desktop sidebar with all 7 spec groups; auto-import name: `<FilterSidebar>`
+- `components/filter/FilterDrawer.vue` — mobile bottom-sheet with staging state + apply/clear footer (commits filters only on apply per spec §4.2)
+- `components/filter/FilterActiveTag.vue` — single removable chip used by both sticky bars
+
+UI states
+- `components/ui/Pagination.vue` — center-on-current truncation (`<UiPagination>`)
+- `components/ui/ProductSkeleton.vue` — animated placeholder (`<UiProductSkeleton>`)
+- `components/ui/EmptyState.vue` — 「NO RESULTS」editorial layout (`<UiEmptyState>`)
+- `components/ui/ErrorState.vue` — 「ERROR」layout with retry callback (`<UiErrorState>`)
+
+Static pages (placeholder copy in `text-neutral-500` for easy find-and-replace)
+- `pages/about.vue` — about + 資料來源 + 免責聲明
+- `pages/contact.vue` — email + 社群 + 問題回報
+- `pages/privacy.vue` — 收集 / cookie / 第三方 / 聯絡(待 tracking 決定後補完)
+- `error.vue` (root) — 自訂 404/5xx 頁,大字號狀態碼
+
+Documentation
+- `docs/API.md` — backend handoff (550 lines): endpoints, query semantics, slug dictionary governance, null contract, **§10 live-backend discrepancy log**, **§11 detail-page proposed fields**
+
+**Not yet built:**
+1. SEO basics — `public/robots.txt` + sitemap module + global default `useSeoMeta`
+2. Detail page (`pages/products/[id].vue` + `GET /api/products/{id}` mock) — Phase 1 scope expansion decided 2026-04-26; depends on backend resolving §10 discrepancies first
+3. Live-backend integration — switch `useFetch` base URL from local mock to `https://feedradar-production.up.railway.app/api/...` once contract gaps are resolved
+4. (Spec §17) Website name / per-page meta description / OG image — joint decision pending
 
 ### Responsive Design
 
@@ -151,7 +185,7 @@ Not yet built (priority order):
 | SSR API failure | Return HTTP 200 with empty product list + ErrorState component (never throw 500) |
 | CSR API failure (filter/page) | Keep previous data visible, show error toast via Nuxt UI `useToast()` |
 | API returns `success: false` | Treat as business error, same as CSR failure |
-| Image load failure | Fallback to `/default-product.png` via `@error` event |
+| Image load failure or `image: null` | Replace `<img>` with `NO IMAGE` placeholder via `imageErrored` ref; never falls back to a 404'ing path that loops |
 | Network offline | Show "network error" message |
 
 Use `useFetch` `default` option to provide empty fallback data, preventing SSR from crashing on API failure.
@@ -179,6 +213,8 @@ Items the backend team or joint decision needs to resolve. Mirrors spec v1.7 §1
 | Crawler update frequency (daily / weekly / manual) | Backend | Pending | — |
 | Standardized value lists for brands / flavors / functional formulas | Backend | Pending | Frontend filter option values depend on this |
 | Add `moisture` field to `nutrition` object | Backend | **Proposed 2026-04-21** | Enables dry-matter-basis (DMB) conversion so protein/fat/carb bars can be compared fairly across wet (≈75% water) and dry (≈10% water) products. Phase 1 (wet-only) uses form-aware macro max and does not strictly need this, but Phase 2+ results that mix wet + dry will render bars on different scales and become misleading without DMB. Low crawl cost — moisture is standard on all pet food "guaranteed analysis" labels. |
+| **Live-backend contract gaps (`flavor` mis-used as ingredients, `id` integer vs string, `special` returns slug, images all null)** | Backend | **Logged 2026-04-26** | See `docs/API.md` §10 for full table. Three are ship-blocking: rename `flavor` → `ingredients` + add real `flavors[]`; return Chinese labels for `special`/`functional`; align `id` type. Frontend will mirror live shape once resolved. |
+| **Detail-page extension fields** (`ingredients`, `images[]`, `feedingGuide`, `origin`, `guaranteedAnalysis`, `sourceUrl`, optional `slug`) | Backend | **Proposed 2026-04-26** | See `docs/API.md` §11. `ingredients` highest priority — backend already scrapes the data, just placed it in the wrong field. `images[]` replaces the singular `image` for both list and detail. |
 | Website name | Joint | Pending | — |
 | Per-page meta descriptions | Joint | Pending | — |
 | OG image design | Joint | Pending | — |
