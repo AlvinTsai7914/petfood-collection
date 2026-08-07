@@ -1,30 +1,14 @@
 <script setup lang="ts">
-interface Nutrition {
-  protein: string | null
-  fat: string | null
-  carbs: string | null
-  phosphorus: string | null
-  calories: string | null
-}
+// ProductCard 對齊新前端 Product 模型(alignment doc §4.1 F1-F8)
+//
+// 主要變化:
+// - 結構化 nutrition 數字直接渲染,不再 regex 拆字串
+// - 熱量改 caloriesKcalPerKg 拼「N 大卡/kg」
+// - 磷有值才渲染整行
+// - 移除 flavors / functional / special tag,新增處方飼料 tag
+// - ID 顯示 PROD-{n}(整數直拼)
 
-interface Product {
-  id: string
-  name: string
-  brand: string
-  type: 'cat' | 'dog'
-  typeLabel: string
-  form: 'wet' | 'dry'
-  formLabel: string
-  flavors: string[]
-  age: string
-  ageLabel: string
-  functional: string[]
-  special: string[]
-  volume: string | null
-  price: number | null
-  image: string | null
-  nutrition: Nutrition
-}
+import type { Product } from '~/composables/useApi'
 
 const props = defineProps<{ product: Product }>()
 
@@ -32,63 +16,74 @@ const emit = defineEmits<{
   (e: 'tag-click', field: string, value: string, label: string): void
 }>()
 
-const splitUnit = (v: string | null | undefined) => {
-  if (!v) return { value: '—', unit: '' }
-  const m = v.match(/^([\d.]+)\s*(.*)$/)
-  return m ? { value: m[1], unit: m[2] } : { value: v, unit: '' }
+// enum → 中文 label(spec 封閉集合,前端可 hardcode;不依賴後端 *Label)
+const PET_TYPE_LABELS: Record<Product['petType'], string> = { cat: '貓', dog: '狗' }
+const FORM_LABELS: Record<Product['form'], string> = { wet: '濕食', dry: '乾糧' }
+const AGE_LABELS: Record<NonNullable<Product['age']>, string> = {
+  kitten: '幼貓/幼犬', adult: '成貓/成犬', senior: '老貓/老犬', all: '全齡',
 }
 
-// 依食物型態調整 bar 參考上限:濕食水分高固形物被稀釋故 max 低;乾糧/零食 max 高
-const MACRO_MAX_BY_FORM: Record<string, number> = {
+const petTypeLabel = computed(() => PET_TYPE_LABELS[props.product.petType])
+const formLabel = computed(() => FORM_LABELS[props.product.form])
+const ageLabel = computed(() =>
+  props.product.age ? AGE_LABELS[props.product.age] : null,
+)
+
+// 依食物型態調整 bar 參考上限:濕食水分高固形物被稀釋故 max 低;乾糧 max 高
+// alignment §4.1 F2:Phase 1 wet-only 沿用此表;Phase 2 跨乾濕考慮 DMB 換算
+const MACRO_MAX_BY_FORM: Record<Product['form'], number> = {
   wet: 15,
   dry: 45,
-  treat: 60,
 }
 
 const macroMax = computed(() => MACRO_MAX_BY_FORM[props.product.form] ?? 15)
 
+// macro bar 三條:蛋白(orange)/ 脂肪(violet)/ 碳水(teal)
+// value === null → 顯示「—」、bar 寬度 0(對應 alignment §3.3 B8c carbsPct 任一輸入 null 整欄位 null)
 const macroRows = computed(() => {
   const n = props.product.nutrition
   const max = macroMax.value
-  const num = (s: string) => {
-    const m = s.match(/^([\d.]+)/)
-    return m ? parseFloat(m[1]) : 0
-  }
-  const mk = (label: string, raw: string | null, color: string) => {
-    if (!raw) return { label, value: '—', bar: 0, color }
-    const v = num(raw)
-    return { label, value: String(v), bar: Math.min(100, (v / max) * 100), color }
+  const mk = (label: string, v: number | null, color: string) => {
+    if (v === null) return { label, value: null, bar: 0, color }
+    return { label, value: v, bar: Math.min(100, (v / max) * 100), color }
   }
   return [
-    mk('蛋白質', n.protein, 'bg-accent-primary'),
-    mk('脂肪', n.fat, 'bg-accent-tertiary'),
-    mk('碳水', n.carbs, 'bg-accent-secondary'),
+    mk('蛋白質', n.proteinPct, 'bg-accent-primary'),
+    mk('脂肪', n.fatPct, 'bg-accent-tertiary'),
+    mk('碳水', n.carbsPct, 'bg-accent-secondary'),
   ]
 })
 
+// 額外營養兩列:磷 / 熱量;null 整行不渲染(alignment §4.1 F4)
 const otherRows = computed(() => {
   const n = props.product.nutrition
-  return [
-    { label: '磷', ...splitUnit(n.phosphorus) },
-    { label: '熱量', ...splitUnit(n.calories) },
-  ]
+  const rows: { label: string; value: string; unit: string }[] = []
+  if (n.phosphorusPct !== null) {
+    rows.push({ label: '磷', value: String(n.phosphorusPct), unit: '%' })
+  }
+  if (n.caloriesKcalPerKg !== null) {
+    rows.push({ label: '熱量', value: String(n.caloriesKcalPerKg), unit: '大卡/kg' })
+  }
+  return rows
 })
 
-// 手機版把 5 項營養壓進同一排,純文字
+// Mobile 把 5 項營養壓進同一排;null 顯示「—」
 const mobileAllNutrition = computed(() => {
   const n = props.product.nutrition
+  const fmt = (v: number | null, unit: string) =>
+    v === null ? { value: '—', unit: '' } : { value: String(v), unit }
   return [
-    { label: '蛋白質', ...splitUnit(n.protein) },
-    { label: '脂肪', ...splitUnit(n.fat) },
-    { label: '碳水', ...splitUnit(n.carbs) },
-    { label: '磷', ...splitUnit(n.phosphorus) },
-    { label: '熱量', ...splitUnit(n.calories) },
+    { label: '蛋白質', ...fmt(n.proteinPct, '%') },
+    { label: '脂肪', ...fmt(n.fatPct, '%') },
+    { label: '碳水', ...fmt(n.carbsPct, '%') },
+    { label: '磷', ...fmt(n.phosphorusPct, '%') },
+    { label: '熱量', ...fmt(n.caloriesKcalPerKg, '大卡/kg') },
   ]
 })
 
-const productCode = computed(() =>
-  props.product.id.replace(/^prod_/i, 'PROD-').toUpperCase()
-)
+const productCode = computed(() => `PROD-${props.product.id}`)
+
+const previewImage = computed(() => props.product.images[0] ?? null)
 
 const imageErrored = ref(false)
 const onImageError = () => {
@@ -100,9 +95,9 @@ const onImageError = () => {
   <article class="group flex flex-col border border-neutral-200 bg-white transition-colors hover:border-neutral-400">
     <div class="aspect-[3/1] overflow-hidden bg-neutral-50">
       <img
-        v-if="product.image && !imageErrored"
-        :src="product.image"
-        :alt="product.name"
+        v-if="previewImage && !imageErrored"
+        :src="previewImage"
+        :alt="product.title"
         class="h-full w-full object-cover"
         loading="lazy"
         @error="onImageError"
@@ -116,50 +111,36 @@ const onImageError = () => {
       <header class="space-y-1">
         <div class="flex items-center justify-between text-caption">
           <span class="font-mono tracking-widest text-neutral-400">{{ productCode }}</span>
-          <span class="uppercase tracking-wider text-neutral-500">{{ product.brand }}</span>
+          <button
+            class="uppercase tracking-wider text-neutral-500 hover:text-accent"
+            @click="emit('tag-click', 'brand', product.brand, product.brand)"
+          >
+            {{ product.brand }}
+          </button>
         </div>
-        <h3 class="text-h3 text-neutral-900 line-clamp-2">{{ product.name }}</h3>
+        <h3 class="text-h3 text-neutral-900 line-clamp-2">{{ product.title }}</h3>
       </header>
 
       <p class="text-small text-neutral-600">
-        <button class="hover:text-accent" @click="emit('tag-click', 'type', product.type, product.typeLabel)">
-          {{ product.typeLabel }}
+        <button class="hover:text-accent" @click="emit('tag-click', 'petType', product.petType, petTypeLabel)">
+          {{ petTypeLabel }}
         </button>
         <span class="mx-2 text-neutral-300">·</span>
-        <button class="hover:text-accent" @click="emit('tag-click', 'form', product.form, product.formLabel)">
-          {{ product.formLabel }}
+        <button class="hover:text-accent" @click="emit('tag-click', 'form', product.form, formLabel)">
+          {{ formLabel }}
         </button>
-        <span class="mx-2 text-neutral-300">·</span>
-        <button class="hover:text-accent" @click="emit('tag-click', 'age', product.age, product.ageLabel)">
-          {{ product.ageLabel }}
-        </button>
-        <template v-for="flavor in product.flavors" :key="flavor">
+        <template v-if="product.age && ageLabel">
           <span class="mx-2 text-neutral-300">·</span>
-          <button class="hover:text-accent" @click="emit('tag-click', 'flavor', flavor, flavor)">
-            {{ flavor }}
+          <button class="hover:text-accent" @click="emit('tag-click', 'age', product.age, ageLabel)">
+            {{ ageLabel }}
           </button>
         </template>
       </p>
 
-      <ul
-        v-if="product.functional.length || product.special.length"
-        class="flex flex-wrap gap-x-3 gap-y-1.5 md:gap-x-4 md:gap-y-2"
-      >
-        <li
-          v-for="f in product.functional"
-          :key="'func-' + f"
-          class="accent-bar-secondary cursor-pointer text-small text-neutral-700 hover:text-neutral-900"
-          @click="emit('tag-click', 'functional', f, f)"
-        >
-          {{ f }}
-        </li>
-        <li
-          v-for="s in product.special"
-          :key="'spec-' + s"
-          class="accent-bar-primary cursor-pointer text-small text-neutral-700 hover:text-neutral-900"
-          @click="emit('tag-click', 'special', s, s)"
-        >
-          {{ s }}
+      <!-- 處方飼料 tag(F8);left bar 用 accent-primary 與其他特殊標記視覺一致 -->
+      <ul v-if="product.isPrescription" class="flex flex-wrap gap-x-3 gap-y-1.5">
+        <li class="accent-bar-primary text-small font-medium text-neutral-700">
+          處方飼料
         </li>
       </ul>
 
@@ -198,13 +179,20 @@ const onImageError = () => {
               <div class="h-full" :class="row.color" :style="{ width: row.bar + '%' }" />
             </div>
             <dd class="text-right font-mono text-small tabular-nums text-neutral-900">
-              {{ row.value }}<span v-if="row.value !== '—'" class="text-neutral-400">%</span>
+              <template v-if="row.value !== null">
+                {{ row.value }}<span class="text-neutral-400">%</span>
+              </template>
+              <template v-else>—</template>
             </dd>
           </div>
         </dl>
       </div>
 
-      <dl class="hidden space-y-1 md:block md:border-t md:border-neutral-100 md:pt-2">
+      <!-- 磷 / 熱量:有值才渲染整行;沒任何一行就整個 dl 不出現 -->
+      <dl
+        v-if="otherRows.length"
+        class="hidden space-y-1 md:block md:border-t md:border-neutral-100 md:pt-2"
+      >
         <div
           v-for="row in otherRows"
           :key="row.label"
@@ -212,7 +200,7 @@ const onImageError = () => {
         >
           <dt class="text-caption text-neutral-500">{{ row.label }}</dt>
           <dd class="font-mono text-small tabular-nums text-neutral-900">
-            {{ row.value }}<span v-if="row.unit" class="ml-1 text-[10px] text-neutral-400">{{ row.unit }}</span>
+            {{ row.value }}<span class="ml-1 text-[10px] text-neutral-400">{{ row.unit }}</span>
           </dd>
         </div>
       </dl>

@@ -1,21 +1,9 @@
 <script setup lang="ts">
-import type { FilterState } from '~/utils/filter-state'
+// 手機底部抽屜篩選 — 與 Sidebar 共用結構,但有 staging 機制
+// 按「套用」才把 staging 寫回 modelValue(spec §4.2 mobile 行為)
 
-interface Option {
-  value: string
-  label: string
-  count?: number
-}
-
-interface FilterOptions {
-  types: Option[]
-  forms: Option[]
-  ages: Option[]
-  brands: Option[]
-  flavors: Option[]
-  functional: Option[]
-  special: Option[]
-}
+import type { FilterOptions } from '~/composables/useApi'
+import type { FilterState, MultiFilterKey } from '~/utils/filter-state'
 
 const props = defineProps<{
   open: boolean
@@ -35,8 +23,11 @@ watch(() => props.open, (o) => {
   if (o) staging.value = cloneFilterState(props.modelValue)
 })
 
-const update = <K extends keyof FilterState>(key: K, v: string[]) => {
+const updateMulti = (key: MultiFilterKey, v: string[]) => {
   staging.value = { ...staging.value, [key]: v }
+}
+const updatePrescription = (v: boolean) => {
+  staging.value = { ...staging.value, isPrescription: v }
 }
 
 const close = () => emit('update:open', false)
@@ -50,15 +41,16 @@ const clearLocal = () => {
 
 const stagingCount = computed(() => countSelected(staging.value))
 
-const groups = computed(() => [
-  { key: 'type' as const, title: '類型', options: props.filterOptions.types },
+const enumGroups = computed(() => [
+  { key: 'petType' as const, title: '類型', options: props.filterOptions.petTypes },
   { key: 'form' as const, title: '食物型態', options: props.filterOptions.forms },
   { key: 'age' as const, title: '適用年齡', options: props.filterOptions.ages },
   { key: 'brand' as const, title: '品牌', options: props.filterOptions.brands },
-  { key: 'flavor' as const, title: '口味', options: props.filterOptions.flavors },
-  { key: 'func' as const, title: '機能配方', options: props.filterOptions.functional },
-  { key: 'special' as const, title: '特殊配方', options: props.filterOptions.special },
 ])
+
+const prescriptionCount = computed(
+  () => props.filterOptions.isPrescription[0]?.count,
+)
 </script>
 
 <template>
@@ -95,12 +87,34 @@ const groups = computed(() => [
           </header>
 
           <div class="flex-1 divide-y divide-neutral-100 overflow-y-auto">
-            <div v-for="g in groups" :key="g.key" class="px-5">
+            <!-- enum 多選 4 組 -->
+            <div v-for="g in enumGroups" :key="g.key" class="px-5">
               <FilterGroup
                 :title="g.title"
                 :options="g.options"
                 :model-value="staging[g.key]"
-                @update:model-value="update(g.key, $event)"
+                @update:model-value="updateMulti(g.key, $event)"
+              />
+            </div>
+
+            <!-- 成分 include / exclude 雙列 -->
+            <div class="px-5">
+              <FilterIngredientFilter
+                :options="filterOptions.ingredients"
+                :include="staging.ingredient"
+                :exclude="staging.excludeIngredient"
+                @update:include="updateMulti('ingredient', $event)"
+                @update:exclude="updateMulti('excludeIngredient', $event)"
+              />
+            </div>
+
+            <!-- 處方飼料 toggle -->
+            <div class="px-5">
+              <FilterToggle
+                :model-value="staging.isPrescription"
+                label="處方飼料"
+                :count="prescriptionCount"
+                @update:model-value="updatePrescription"
               />
             </div>
           </div>

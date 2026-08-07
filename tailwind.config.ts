@@ -32,6 +32,7 @@ export default <Partial<Config>>{
           secondary: '#14b8a6',
           tertiary: '#7c3aed',
         },
+        danger: '#dc2626',
       },
       fontSize: {
         h1: ['2rem', { lineHeight: '2.5rem', fontWeight: '700' }],

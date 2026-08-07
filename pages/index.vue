@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FilterKey, FilterState } from '~/utils/filter-state'
+import type { FilterKey, FilterState, MultiFilterKey } from '~/utils/filter-state'
 
 // 首頁有自己的 full-height flex + 獨立 scrollbar + header 縮放,不套 default layout
 definePageMeta({ layout: false })
@@ -24,97 +24,85 @@ watch(filters, (f) => {
   if (syncingFromUrl) return
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
-    const query: Record<string, string> = {}
-    for (const k of FILTER_KEYS) {
-      if (f[k].length) query[k] = f[k].join(',')
-    }
-    router.replace({ query })
+    router.replace({ query: toQueryParams(f) })
   }, 300)
 }, { deep: true })
 
-// 抓篩選選項(靜態、1 hr 快取)
-const { data: filtersData } = await useFetch('/api/filters', {
-  key: 'filters',
-  default: () => ({
-    success: true as const,
-    data: {
-      types: [], forms: [], ages: [], brands: [], flavors: [], functional: [], special: [],
-    },
-  }),
-})
-const filterOptions = computed(() => filtersData.value!.data)
+// 抓篩選選項(靜態、1 hr 快取);composable 已 normalize 出 5 + 1 組
+const { data: filterOptions } = await useFilters()
 
-// 只把 filter/pagination 相關 query 傳給 useFetch,避免 hash 等無關 query 變動觸發 refetch
+// API 參數只從 route.query 推導(不讀內存 filters):
+// 內存 filters 變動先經 300ms debounce 寫回 URL,URL 變了才觸發 refetch —
+// 每次點選只打一次 API,且分享連結 / 上一頁下一頁天然一致
 const productsQuery = computed(() => {
-  const out: Record<string, string> = {}
-  for (const k of FILTER_KEYS) {
-    const v = route.query[k]
-    if (v) out[k] = String(v)
-  }
+  const out: Record<string, string> = { ...toQueryParams(parseFilterQuery(route.query)) }
   if (route.query.page) out.page = String(route.query.page)
   if (route.query.limit) out.limit = String(route.query.limit)
   return out
 })
 
-// 抓產品(反應式 URL query → 自動 refetch)
-const { data: productsData, pending, error, refresh } = await useFetch('/api/products', {
-  query: productsQuery,
-  default: () => ({
-    success: true as const,
-    data: {
-      products: [],
-      pagination: { page: 1, limit: 24, total: 0, totalPages: 1 },
-    },
-  }),
-})
-const products = computed(() => productsData.value!.data.products)
-const pagination = computed(() => productsData.value!.data.pagination)
+// 抓產品(URL query 變動 → 自動 refetch);composable 統一吃 envelope 與 normalize
+const { data: productList, pending, error, refresh } = await useProducts(productsQuery)
+const products = computed(() => productList.value!.products)
+const pagination = computed(() => productList.value!.pagination)
 
 // Drawer
 const drawerOpen = ref(false)
 
 const totalSelected = computed(() => countSelected(filters.value))
 
-const optionsByKey = computed<Record<FilterKey, Array<{ value: string; label: string }>>>(() => {
-  const o = filterOptions.value
+// 多選欄位的 label 對應(用於 active tag 顯示中文)
+const multiOptionsByKey = computed<Record<MultiFilterKey, { value: string; label: string }[]>>(() => {
+  const o = filterOptions.value!
   return {
-    type: o.types, form: o.forms, age: o.ages, brand: o.brands,
-    flavor: o.flavors, func: o.functional, special: o.special,
+    petType: o.petTypes,
+    form: o.forms,
+    age: o.ages,
+    brand: o.brands,
+    ingredient: o.ingredients,
+    excludeIngredient: o.ingredients,
   }
 })
 
-// 已選標籤(從 filters + filterOptions 推導顯示用中文 label)
+// 已選標籤(從 filters + filterOptions 推導顯示用 label;排除成分前綴 「排除:」 區別)
 const activeTags = computed(() => {
   const rows: { field: FilterKey; value: string; label: string }[] = []
-  for (const key of FILTER_KEYS) {
+  for (const key of MULTI_FILTER_KEYS) {
+    const list = multiOptionsByKey.value[key]
     for (const v of filters.value[key]) {
-      const label = optionsByKey.value[key]?.find(o => o.value === v)?.label ?? v
+      const baseLabel = list?.find(o => o.value === v)?.label ?? v
+      const label = key === 'excludeIngredient' ? `排除:${baseLabel}` : baseLabel
       rows.push({ field: key, value: v, label })
     }
+  }
+  if (filters.value.isPrescription) {
+    rows.push({ field: 'isPrescription', value: 'true', label: '處方飼料' })
   }
   return rows
 })
 
-// 卡片上點標籤 → 加入篩選(把 value 或 label 正規化回 slug)
-const cardFieldToFilterKey: Record<string, FilterKey> = {
-  type: 'type', form: 'form', age: 'age',
-  flavor: 'flavor', functional: 'func', special: 'special',
+// 卡片上點標籤 → 加入篩選;step C 改完 ProductCard 後 fields 會固定為以下幾個
+const cardFieldToFilterKey: Record<string, MultiFilterKey> = {
+  petType: 'petType',
+  form: 'form',
+  age: 'age',
+  brand: 'brand',
+  ingredient: 'ingredient',
 }
 
 const onCardTagClick = (field: string, value: string) => {
   const key = cardFieldToFilterKey[field]
   if (!key) return
-  const list = optionsByKey.value[key]
-  // type/form/age 由卡片帶出 slug,flavor/func/special 帶出中文 label;兩種都正規化回 slug
-  const slug = list.find(o => o.value === value)?.value
-    ?? list.find(o => o.label === value)?.value
-    ?? value
-  if (!filters.value[key].includes(slug)) {
-    filters.value[key] = [...filters.value[key], slug]
+  if (!filters.value[key].includes(value)) {
+    filters.value[key] = [...filters.value[key], value]
   }
 }
 
 const removeTag = (field: FilterKey, value: string) => {
+  if (field === 'isPrescription') {
+    filters.value.isPrescription = false
+    return
+  }
   filters.value[field] = filters.value[field].filter(v => v !== value)
 }
 
@@ -156,7 +144,7 @@ onBeforeUnmount(() => {
     <div class="flex min-h-0 flex-1">
       <FilterSidebar
         v-model="filters"
-        :filter-options="filterOptions"
+        :filter-options="filterOptions!"
         class="hidden w-64 flex-none overflow-y-auto md:block"
       />
 
@@ -257,7 +245,7 @@ onBeforeUnmount(() => {
     <FilterDrawer
       v-model:open="drawerOpen"
       v-model="filters"
-      :filter-options="filterOptions"
+      :filter-options="filterOptions!"
     />
   </div>
 </template>
