@@ -78,13 +78,16 @@ First page load uses SSR (Nuxt server calls API, renders full HTML). Subsequent 
 ### API Endpoints
 
 - `GET /api/products` — Product listing with filtering & pagination (24 per page)
-- `GET /api/filters` — All filter options (brands, types, flavors, etc.)
+- `GET /api/products/{id}` — Single product for the detail page (mock route exists; page not built yet)
+- `GET /api/filters` — All filter options (5 + 1 groups per alignment doc §2.3)
 
 API responses wrap in `{ success: bool, data: {...} }`. Errors use `{ success: false, error: { code, message } }`.
 
+**Live-proxy switch**: setting `NUXT_LIVE_API=1` (mapped via `runtimeConfig.liveApi`) makes all three server routes proxy the live backend at `feedradar-production.up.railway.app` instead of serving the local mock — useful for previewing real data. Default (unset) serves the mock. Live `/api/filters` was intermittently 500 as of 2026-08-04; the proxy degrades to `success: false` so the UI falls back to empty filter options.
+
 ### Filter System
 
-Filters sync to URL query params (`brand`, `type`, `form`, `flavor`, `age`, `func`, `special`, `page`). Logic: OR within same field, AND across fields. Clicking a product card tag adds it to the active filters.
+Filters sync to URL query params (`petType`, `form`, `age`, `brand`, `ingredient`, `excludeIngredient`, `isPrescription`, `page`). Logic: OR within same field, AND across fields; `excludeIngredient` is AND-NOT; `isPrescription` is a boolean toggle (`true` or absent). Clicking a product card tag (brand / petType / form / age) adds it to the active filters. `utils/filter-state.ts` (`parseFilterQuery` / `toQueryParams`) is the only URL boundary.
 
 - **Filtering is server-side**: frontend collects query params, calls API, displays results. Frontend does NOT filter data locally — this is designed for scalability (Phase 2-3: thousands of products).
 - **`/api/filters` is static**: fetched once on app load and cached. It does NOT change based on current filter selections (no faceted search in Phase 1).
@@ -92,15 +95,16 @@ Filters sync to URL query params (`brand`, `type`, `form`, `flavor`, `age`, `fun
 - **Mobile**: Drawer with "apply" button — API call only fires on apply. Drawer opens reading from URL state; apply writes back to URL via `router.push()`.
 - **URL sync**: URL always reflects the currently displayed results. `useRoute().query` serves as the source of truth for `useFetch` params.
 
-### Key Filter Fields (in sidebar order)
+### Key Filter Fields (in sidebar order; "5 + 1" per alignment doc §2.3)
 
-1. type (cat/dog)
+1. petType (cat/dog)
 2. form (wet/dry)
-3. age (kitten/adult/senior/all)
-4. brand (dynamic from API)
-5. flavor (dynamic from API)
-6. functional formula (kidney/urinary/digest/skin/joint/hairball/weight)
-7. special formula (grain-free/hypoallergenic)
+3. age (kitten/adult/senior/all — enum still disputed with live backend, see backend-issues #2)
+4. brand (dynamic from API; Chinese label doubles as value in Phase 1)
+5. ingredient — include (OR) / exclude (AND NOT) dual lists backed by the backend-governed ingredient dictionary; matched by substring against `ingredientsText` (SQL LIKE semantics)
+6. isPrescription — boolean toggle (the "+1")
+
+The pre-alignment fields flavor / functional / special were removed from Phase 1 (kept as always-empty schema placeholders in the API).
 
 ### Component Structure (planned)
 
@@ -112,7 +116,19 @@ components/
   ui/        — Pagination, LoadingSpinner, EmptyState, ErrorState
 ```
 
-### Current implementation status (as of 2026-04-27)
+### Current implementation status (as of 2026-08-05)
+
+**Backend-v2 contract alignment (completed 2026-08-05; work started 2026-07-21):**
+- `composables/useApi.ts` — normalizer layer: backend v2 shape → frontend `Product` / `FilterOptions` models; `useFilters` / `useProducts` / `useProduct` composables (useAsyncData + $fetch). UI never touches raw backend fields.
+- `utils/filter-state.ts` — rewritten to the 5 + 1 model (`MULTI_FILTER_KEYS` + `isPrescription` toggle); added `toQueryParams` as the write-side URL boundary.
+- `components/filter/IngredientFilter.vue` — ingredient include/exclude dual lists (dropdown + chips; exclude uses danger bar + line-through).
+- `components/filter/FilterToggle.vue` — reusable boolean toggle (prescription now; grain-free etc. later).
+- `ProductCard.vue` — structured nutrition numbers (no string parsing), hardcoded enum labels, `PROD-{n}` ids, prescription tag, `images[0]` preview.
+- `server/utils/catalog.ts` — mock rebuilt to v2 shape (integer ids, `ingredientsText` raw string, ingredient dictionary, structured nutrition, `findProduct` for detail).
+- `server/api/products/[id].get.ts` — detail mock route wired to `findProduct` (NOT_FOUND business error for missing ids).
+- Live-proxy switch `NUXT_LIVE_API=1` on all three server routes (see API Endpoints above).
+
+### Pre-alignment status (as of 2026-04-27)
 
 **Built and runnable via `npm run dev`:**
 
@@ -161,8 +177,8 @@ Documentation
 
 **Not yet built:**
 1. SEO basics — `public/robots.txt` + sitemap module + global default `useSeoMeta`
-2. Detail page (`pages/products/[id].vue` + `GET /api/products/{id}` mock) — Phase 1 scope expansion decided 2026-04-26; depends on backend resolving §10 discrepancies first
-3. Live-backend integration — switch `useFetch` base URL from local mock to `https://feedradar-production.up.railway.app/api/...` once contract gaps are resolved
+2. Detail page UI (`pages/products/[id].vue`) — mock route + `useProduct` composable are ready; the page itself is pending backend resolving the §10 / backend-issues-260515 discrepancies
+3. Live-backend cutover — proxy switch exists (`NUXT_LIVE_API=1`) but defaulting to live blocks on backend fixing backend-issues-260515 P0s (no wet-food data, age enum, ingredients array split, variants[])
 4. (Spec §17) Website name / per-page meta description / OG image — joint decision pending
 
 ### Responsive Design
@@ -192,7 +208,7 @@ Use `useFetch` `default` option to provide empty fallback data, preventing SSR f
 
 ## Data Model
 
-Product fields: id, name, brand, type, form, flavors[], age, functional[], special[], volume, price (TWD), image (URL), nutrition { protein, fat, carbs, phosphorus, calories }. All labels returned from backend in Chinese; nutrition values include units.
+Frontend `Product` model (see `composables/useApi.ts`, the source of truth): id (int), title, brand, petType, form, age (nullable), volume, price (TWD), priceSource, priceUpdatedAt, images[], ingredientsText (raw label string, never parsed by frontend), isPrescription, isGrainFree (Phase 2 placeholder), functional[] (Phase 2 placeholder), nutrition { proteinPct, fatPct, fiberPct, carbsPct, phosphorusPct, caloriesKcalPerKg } — all numbers, all nullable. Enum → Chinese labels are hardcoded in the frontend (closed sets); brand is Chinese and doubles as filter value.
 
 ## Important Conventions
 
