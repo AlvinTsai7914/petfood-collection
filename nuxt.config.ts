@@ -1,5 +1,9 @@
 export default defineNuxtConfig({
   compatibilityDate: '2026-04-01',
+  runtimeConfig: {
+    // NUXT_LIVE_API=1 時 server route 代理 live 後端(見 server/api/*.get.ts)
+    liveApi: '',
+  },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   ui: {
