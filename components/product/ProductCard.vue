@@ -16,13 +16,7 @@ const emit = defineEmits<{
   (e: 'tag-click', field: string, value: string, label: string): void
 }>()
 
-// enum → 中文 label(spec 封閉集合,前端可 hardcode;不依賴後端 *Label)
-const PET_TYPE_LABELS: Record<Product['petType'], string> = { cat: '貓', dog: '狗' }
-const FORM_LABELS: Record<Product['form'], string> = { wet: '濕食', dry: '乾糧' }
-const AGE_LABELS: Record<NonNullable<Product['age']>, string> = {
-  kitten: '幼貓/幼犬', adult: '成貓/成犬', senior: '老貓/老犬', all: '全齡',
-}
-
+// enum → 中文 label 共用對照表在 utils/product-labels.ts(詳情頁同用)
 const petTypeLabel = computed(() => PET_TYPE_LABELS[props.product.petType])
 const formLabel = computed(() => FORM_LABELS[props.product.form])
 const ageLabel = computed(() =>
@@ -93,7 +87,7 @@ const onImageError = () => {
 
 <template>
   <article class="group flex flex-col border border-neutral-200 bg-white transition-colors hover:border-neutral-400">
-    <div class="aspect-[3/1] overflow-hidden bg-neutral-50">
+    <NuxtLink :to="`/products/${product.id}`" class="block aspect-[3/1] overflow-hidden bg-neutral-50">
       <img
         v-if="previewImage && !imageErrored"
         :src="previewImage"
@@ -105,7 +99,7 @@ const onImageError = () => {
       <div v-else class="flex h-full w-full items-center justify-center">
         <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
       </div>
-    </div>
+    </NuxtLink>
 
     <div class="flex flex-1 flex-col gap-2 px-3 py-2.5 md:gap-2.5 md:px-4 md:py-3">
       <header class="space-y-1">
@@ -118,7 +112,9 @@ const onImageError = () => {
             {{ product.brand }}
           </button>
         </div>
-        <h3 class="text-h3 text-neutral-900 line-clamp-2">{{ product.title }}</h3>
+        <h3 class="text-h3 text-neutral-900 line-clamp-2">
+          <NuxtLink :to="`/products/${product.id}`" class="hover:text-accent">{{ product.title }}</NuxtLink>
+        </h3>
       </header>
 
       <p class="text-small text-neutral-600">

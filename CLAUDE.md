@@ -78,7 +78,7 @@ First page load uses SSR (Nuxt server calls API, renders full HTML). Subsequent 
 ### API Endpoints
 
 - `GET /api/products` — Product listing with filtering & pagination (24 per page)
-- `GET /api/products/{id}` — Single product for the detail page (mock route exists; page not built yet)
+- `GET /api/products/{id}` — Single product for the detail page (mock route + page built; live backend has no such endpoint yet, see backend-issues #13)
 - `GET /api/filters` — All filter options (5 + 1 groups per alignment doc §2.3)
 
 API responses wrap in `{ success: bool, data: {...} }`. Errors use `{ success: false, error: { code, message } }`.
@@ -127,6 +127,12 @@ components/
 - `server/utils/catalog.ts` — mock rebuilt to v2 shape (integer ids, `ingredientsText` raw string, ingredient dictionary, structured nutrition, `findProduct` for detail).
 - `server/api/products/[id].get.ts` — detail mock route wired to `findProduct` (NOT_FOUND business error for missing ids).
 - Live-proxy switch `NUXT_LIVE_API=1` on all three server routes (see API Endpoints above).
+
+**Detail page (F16, completed 2026-08-14):**
+- `pages/products/[id].vue` — display strategy adjusted per backend-issues v3 attribution analysis: `nutritionText` raw string is the primary guaranteed-analysis display (highest data coverage, 88-93%), structured fields render as supplementary rows (null rows omitted); single image with thumbnail strip only when `images.length > 1` (live currently has one image per product); `ingredientsText` as a plain paragraph, no chip interaction (§2.4/§3.0); conditional feedingGuide / origin / sourceUrl sections appear automatically once the backend supplies them.
+- `utils/product-labels.ts` — shared enum→Chinese label maps (extracted from ProductCard).
+- `Product` model extended with `nutritionText` / `sourceUrl` (maps live top-level `url`) / `feedingGuide` / `origin`; mock synthesizes `nutritionText` from structured fields.
+- ProductCard image and title now link to `/products/{id}`.
 
 ### Pre-alignment status (as of 2026-04-27)
 
@@ -177,9 +183,8 @@ Documentation
 
 **Not yet built:**
 1. SEO basics — `public/robots.txt` + sitemap module + global default `useSeoMeta`
-2. Detail page UI (`pages/products/[id].vue`) — mock route + `useProduct` composable are ready; the page itself is pending backend resolving the §10 / backend-issues-260515 discrepancies
-3. Live-backend cutover — proxy switch exists (`NUXT_LIVE_API=1`) but defaulting to live blocks on backend fixing backend-issues-260515 P0s (no wet-food data, age enum, ingredients array split, variants[])
-4. (Spec §17) Website name / per-page meta description / OG image — joint decision pending
+2. Live-backend cutover — proxy switch exists (`NUXT_LIVE_API=1`) but defaulting to live blocks on backend fixing backend-issues-260515 P0s (#0 intermittent 500s, #13 missing detail endpoint, #3 ingredientsText, plus scope decision on wet food)
+3. (Spec §17) Website name / per-page meta description / OG image — joint decision pending
 
 ### Responsive Design
 

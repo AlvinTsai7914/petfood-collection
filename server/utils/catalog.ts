@@ -204,6 +204,24 @@ export const getFilterOptions = () => FILTER_OPTIONS
 // Query 篩選 / 分頁
 // ============================================================
 
+// 從結構化欄位合成「包裝原樣」保證分析字串,模擬 live 的 nutritionText
+// (live 是爬蟲抓原樣、後端 parse 出結構化;mock 反向合成,shape 一致即可)
+const buildNutritionText = (pr: MockProduct): string => {
+  const parts: string[] = [
+    `粗蛋白質 最低量 ${pr.proteinPct.toFixed(2)}%`,
+    `粗脂肪 最低量 ${pr.fatPct.toFixed(2)}%`,
+  ]
+  if (pr.fiberPct !== null) parts.push(`粗纖維 最高量 ${pr.fiberPct.toFixed(2)}%`)
+  parts.push(`水分 最高量 ${pr.form === 'wet' ? '82.00' : '10.00'}%`)
+  parts.push(`灰分 最高量 ${pr.form === 'wet' ? '3.00' : '8.00'}%`)
+  if (pr.phosphorusPct !== null) parts.push(`磷 最低量 ${pr.phosphorusPct.toFixed(2)}%`)
+  return parts.join('、')
+}
+
+// 來源頁連結 mock(live 為 lovecat / petpark 商品頁,見 backend-issues #7)
+const buildSourceUrl = (pr: MockProduct): string =>
+  `https://shop.example.tw/products/prod-${pr.id}`
+
 const arr = (v: unknown): string[] => {
   if (!v) return []
   if (Array.isArray(v)) return v.flatMap(x => String(x).split(',')).filter(Boolean)
@@ -257,6 +275,8 @@ export const queryProducts = (query: Record<string, unknown>) => {
     priceUpdatedAt: '2026-05-01',
     images: [`https://picsum.photos/seed/petfood-${pr.id}/600/400`],
     ingredientsText: pr.ingredientsText,
+    nutritionText: buildNutritionText(pr),
+    url: buildSourceUrl(pr),
     proteinPct: pr.proteinPct,
     fatPct: pr.fatPct,
     fiberPct: pr.fiberPct,
@@ -294,6 +314,8 @@ export const findProduct = (id: number) => {
       `https://picsum.photos/seed/petfood-${pr.id}-back/800/600`,
     ],
     ingredientsText: pr.ingredientsText,
+    nutritionText: buildNutritionText(pr),
+    url: buildSourceUrl(pr),
     proteinPct: pr.proteinPct,
     fatPct: pr.fatPct,
     fiberPct: pr.fiberPct,
@@ -302,9 +324,8 @@ export const findProduct = (id: number) => {
     caloriesKcalPerKg: pr.caloriesKcalPerKg,
     functional: [] as string[],
     isGrainFree: null,
-    // 詳情頁擴展欄位(列表頁不回);Phase 1 mock 暫給 null,等後端 alignment §11.2 補資料
+    // 詳情頁擴展欄位;Phase 1 mock 暫給 null,等後端 alignment §11.2 補資料
     feedingGuide: null,
     origin: null,
-    sourceUrl: null,
   }
 }

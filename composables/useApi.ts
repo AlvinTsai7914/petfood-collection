@@ -70,6 +70,12 @@ export interface ApiProduct {
   // alignment §3.4:Phase 1 schema 保留,永遠空 / null
   functional?: string[]
   isGrainFree?: boolean | null
+
+  // 詳情頁欄位(backend-issues #7:live 回頂層 url;alignment §11 提案名為 sourceUrl)
+  url?: string | null
+  sourceUrl?: string | null
+  feedingGuide?: string | null
+  origin?: string | null
 }
 
 export interface ApiPagination {
@@ -128,10 +134,16 @@ export interface Product {
   images: string[]
   // alignment §3.0:這是「產品包裝原樣字串」,跟篩選字典是不同欄位
   ingredientsText: string | null
+  // 保證分析原樣字串 — 詳情頁主要顯示(v3 歸因分析:覆蓋率最高的營養資料源)
+  nutritionText: string | null
   isPrescription: boolean
   isGrainFree: boolean | null
   functional: string[]
   nutrition: ProductNutrition
+  // 詳情頁欄位;來源連結對 live 的頂層 url 取值
+  sourceUrl: string | null
+  feedingGuide: string | null
+  origin: string | null
 }
 
 export interface ProductList {
@@ -174,6 +186,7 @@ export const normalizeProduct = (raw: ApiProduct): Product => ({
   images: strArr(raw.images),
   // alignment §3.2 B6:後端維持字串原樣,前端僅在詳情頁原樣顯示
   ingredientsText: str(raw.ingredientsText),
+  nutritionText: str(raw.nutritionText),
   isPrescription: Boolean(raw.isPrescription),
   isGrainFree: typeof raw.isGrainFree === 'boolean' ? raw.isGrainFree : null,
   functional: strArr(raw.functional),
@@ -185,6 +198,9 @@ export const normalizeProduct = (raw: ApiProduct): Product => ({
     phosphorusPct: num(raw.phosphorusPct),
     caloriesKcalPerKg: num(raw.caloriesKcalPerKg),
   },
+  sourceUrl: str(raw.url) ?? str(raw.sourceUrl),
+  feedingGuide: str(raw.feedingGuide),
+  origin: str(raw.origin),
 })
 
 export const normalizeFilters = (raw: ApiFiltersData): FilterOptions => ({
