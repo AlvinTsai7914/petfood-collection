@@ -24,12 +24,23 @@ const ageLabel = computed(() =>
 
 const productCode = computed(() => product.value ? `PROD-${product.value.id}` : '')
 
-// 主圖 + 縮圖列(多圖才顯示縮圖;live 現況單圖,carousel 等資料出現再升級)
+// 圖片滑動切換 — CSS scroll-snap 實作 swiper 式體驗(零依賴)
+// 手機用手勢滑、桌機滾動或點縮圖;active index 從 scroll 位置推導
+const images = computed(() => product.value?.images ?? [])
+const scroller = ref<HTMLElement | null>(null)
 const activeImageIndex = ref(0)
-const activeImage = computed(() => product.value?.images[activeImageIndex.value] ?? null)
-const imageErrored = ref(false)
-const onImageError = () => { imageErrored.value = true }
-watch(activeImageIndex, () => { imageErrored.value = false })
+const erroredImages = ref(new Set<string>())
+const onImageError = (src: string) => {
+  erroredImages.value = new Set(erroredImages.value).add(src)
+}
+const onScroll = () => {
+  const el = scroller.value
+  if (!el || !el.clientWidth) return
+  activeImageIndex.value = Math.round(el.scrollLeft / el.clientWidth)
+}
+const scrollToImage = (i: number) => {
+  scroller.value?.scrollTo({ left: i * scroller.value.clientWidth, behavior: 'smooth' })
+}
 
 // 結構化營養輔助列:有值才進表(v3 歸因:null 是來源頁天生沒標,不渲染「—」)
 const nutritionRows = computed(() => {
@@ -92,31 +103,51 @@ const nutritionRows = computed(() => {
       </nav>
 
       <div class="mt-6 grid gap-8 md:grid-cols-2 md:gap-10">
-        <!-- 圖片區 -->
+        <!-- 圖片區:scroll-snap 滑動切換 -->
         <div>
-          <div class="aspect-[4/3] overflow-hidden border border-neutral-200 bg-neutral-50">
-            <img
-              v-if="activeImage && !imageErrored"
-              :src="activeImage"
-              :alt="product.title"
-              class="h-full w-full object-cover"
-              @error="onImageError"
-            />
-            <div v-else class="flex h-full w-full items-center justify-center">
-              <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
+          <div
+            v-if="images.length"
+            ref="scroller"
+            class="scrollbar-none flex aspect-[4/3] snap-x snap-mandatory overflow-x-auto border border-neutral-200 bg-neutral-50"
+            @scroll.passive="onScroll"
+          >
+            <div
+              v-for="img in images"
+              :key="img"
+              class="h-full w-full flex-none snap-center"
+            >
+              <img
+                v-if="!erroredImages.has(img)"
+                :src="img"
+                :alt="product.title"
+                class="h-full w-full object-cover"
+                @error="onImageError(img)"
+              />
+              <div v-else class="flex h-full w-full items-center justify-center">
+                <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
+              </div>
             </div>
           </div>
-          <!-- 多圖才出縮圖列 -->
-          <div v-if="product.images.length > 1" class="mt-2 flex gap-2">
-            <button
-              v-for="(img, i) in product.images"
-              :key="img"
-              class="h-16 w-16 overflow-hidden border transition-colors"
-              :class="i === activeImageIndex ? 'border-neutral-900' : 'border-neutral-200 hover:border-neutral-400'"
-              @click="activeImageIndex = i"
-            >
-              <img :src="img" :alt="`${product.title} 圖 ${i + 1}`" class="h-full w-full object-cover" />
-            </button>
+          <div v-else class="flex aspect-[4/3] items-center justify-center border border-neutral-200 bg-neutral-50">
+            <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
+          </div>
+
+          <!-- 多圖:縮圖導覽 + 進度指示 -->
+          <div v-if="images.length > 1" class="mt-2 flex items-center justify-between">
+            <div class="flex gap-2">
+              <button
+                v-for="(img, i) in images"
+                :key="img"
+                class="h-16 w-16 overflow-hidden border transition-colors"
+                :class="i === activeImageIndex ? 'border-neutral-900' : 'border-neutral-200 hover:border-neutral-400'"
+                @click="scrollToImage(i)"
+              >
+                <img :src="img" :alt="`${product.title} 圖 ${i + 1}`" class="h-full w-full object-cover" />
+              </button>
+            </div>
+            <span class="font-mono text-caption tabular-nums text-neutral-400">
+              {{ activeImageIndex + 1 }} / {{ images.length }}
+            </span>
           </div>
         </div>
 

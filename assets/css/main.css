@@ -52,4 +52,6 @@
   .accent-bar-danger    { border-left: 2px solid var(--color-danger);     padding-left: 0.5rem; }
   .hairline-b           { border-bottom: 1px solid var(--color-divider); }
   .hairline-t           { border-top:    1px solid var(--color-divider); }
+  .scrollbar-none       { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 }

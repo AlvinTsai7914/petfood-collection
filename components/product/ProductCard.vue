@@ -86,8 +86,14 @@ const onImageError = () => {
 </script>
 
 <template>
-  <article class="group flex flex-col border border-neutral-200 bg-white transition-colors hover:border-neutral-400">
-    <NuxtLink :to="`/products/${product.id}`" class="block aspect-[3/1] overflow-hidden bg-neutral-50">
+  <article class="group relative flex flex-col border border-neutral-200 bg-white transition-colors hover:border-neutral-400">
+    <!-- stretched link:整卡可點進詳情頁;tag 按鈕以 z-10 蓋在上面維持篩選功能 -->
+    <NuxtLink
+      :to="`/products/${product.id}`"
+      class="absolute inset-0 z-[1]"
+      :aria-label="product.title"
+    />
+    <div class="aspect-[3/1] overflow-hidden bg-neutral-50">
       <img
         v-if="previewImage && !imageErrored"
         :src="previewImage"
@@ -99,35 +105,33 @@ const onImageError = () => {
       <div v-else class="flex h-full w-full items-center justify-center">
         <span class="font-mono text-caption tracking-widest text-neutral-400">NO IMAGE</span>
       </div>
-    </NuxtLink>
+    </div>
 
     <div class="flex flex-1 flex-col gap-2 px-3 py-2.5 md:gap-2.5 md:px-4 md:py-3">
       <header class="space-y-1">
         <div class="flex items-center justify-between text-caption">
           <span class="font-mono tracking-widest text-neutral-400">{{ productCode }}</span>
           <button
-            class="uppercase tracking-wider text-neutral-500 hover:text-accent"
+            class="relative z-10 uppercase tracking-wider text-neutral-500 hover:text-accent"
             @click="emit('tag-click', 'brand', product.brand, product.brand)"
           >
             {{ product.brand }}
           </button>
         </div>
-        <h3 class="text-h3 text-neutral-900 line-clamp-2">
-          <NuxtLink :to="`/products/${product.id}`" class="hover:text-accent">{{ product.title }}</NuxtLink>
-        </h3>
+        <h3 class="text-h3 text-neutral-900 line-clamp-2 group-hover:text-accent">{{ product.title }}</h3>
       </header>
 
       <p class="text-small text-neutral-600">
-        <button class="hover:text-accent" @click="emit('tag-click', 'petType', product.petType, petTypeLabel)">
+        <button class="relative z-10 hover:text-accent" @click="emit('tag-click', 'petType', product.petType, petTypeLabel)">
           {{ petTypeLabel }}
         </button>
         <span class="mx-2 text-neutral-300">·</span>
-        <button class="hover:text-accent" @click="emit('tag-click', 'form', product.form, formLabel)">
+        <button class="relative z-10 hover:text-accent" @click="emit('tag-click', 'form', product.form, formLabel)">
           {{ formLabel }}
         </button>
         <template v-if="product.age && ageLabel">
           <span class="mx-2 text-neutral-300">·</span>
-          <button class="hover:text-accent" @click="emit('tag-click', 'age', product.age, ageLabel)">
+          <button class="relative z-10 hover:text-accent" @click="emit('tag-click', 'age', product.age, ageLabel)">
             {{ ageLabel }}
           </button>
         </template>
