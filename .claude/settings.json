@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Invoke-WebRequest *)",
+      "PowerShell(Invoke-RestMethod *)",
+      "Bash(curl *)",
+      "PowerShell(npx nuxi typecheck)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(npm run dev)"
+    ],
+    "ask": [
+      "Bash(ssh *)",
+      "PowerShell(ssh *)",
+      "Bash(scp *)",
+      "PowerShell(scp *)",
+      "Bash(npm publish *)",
+      "PowerShell(npm publish *)",
+      "Bash(vercel *)",
+      "PowerShell(vercel *)",
+      "Bash(netlify *)",
+      "PowerShell(netlify *)",
+      "Bash(gh pr create *)",
+      "PowerShell(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "PowerShell(gh pr merge *)",
+      "Bash(gh pr comment *)",
+      "PowerShell(gh pr comment *)",
+      "Bash(gh issue create *)",
+      "PowerShell(gh issue create *)",
+      "Bash(gh issue comment *)",
+      "PowerShell(gh issue comment *)",
+      "Bash(gh release *)",
+      "PowerShell(gh release *)",
+      "PowerShell(Send-MailMessage *)",
+      "mcp__claude_ai_Gmail__create_draft",
+      "mcp__claude_ai_Google_Calendar__create_event",
+      "mcp__claude_ai_Google_Calendar__update_event",
+      "mcp__claude_ai_Google_Calendar__delete_event",
+      "mcp__claude_ai_Google_Calendar__respond_to_event",
+      "mcp__claude_ai_Google_Drive__create_file",
+      "mcp__claude_ai_Google_Drive__copy_file"
+    ]
+  }
+}
