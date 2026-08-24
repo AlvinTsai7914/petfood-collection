@@ -129,10 +129,10 @@ components/
 - Live-proxy switch `NUXT_LIVE_API=1` on all three server routes (see API Endpoints above).
 
 **Detail page (F16, completed 2026-08-14):**
-- `pages/products/[id].vue` — display strategy adjusted per backend-issues v3 attribution analysis: `nutritionText` raw string is the primary guaranteed-analysis display (highest data coverage, 88-93%), structured fields render as supplementary rows (null rows omitted); single image with thumbnail strip only when `images.length > 1` (live currently has one image per product); `ingredientsText` as a plain paragraph, no chip interaction (§2.4/§3.0); conditional feedingGuide / origin / sourceUrl sections appear automatically once the backend supplies them.
+- `pages/products/[id].vue` — display strategy adjusted per backend-issues v3 attribution analysis: `nutritionText` raw string is the primary guaranteed-analysis display (highest data coverage, 88-93%), structured fields render as supplementary rows (null rows omitted); images render in a scroll-snap horizontal swiper (touch/trackpad, no dependency) with thumbnail navigation and an n-of-total counter shown only when `images.length > 1` (live currently has one image per product); `ingredientsText` as a plain paragraph, no chip interaction (§2.4/§3.0); conditional feedingGuide / origin / sourceUrl sections appear automatically once the backend supplies them.
 - `utils/product-labels.ts` — shared enum→Chinese label maps (extracted from ProductCard).
 - `Product` model extended with `nutritionText` / `sourceUrl` (maps live top-level `url`) / `feedingGuide` / `origin`; mock synthesizes `nutritionText` from structured fields.
-- ProductCard image and title now link to `/products/{id}`.
+- ProductCard is fully clickable via a stretched link (absolute-inset NuxtLink); tag-filter buttons sit above it at z-10 so they still add filters instead of navigating.
 
 ### Pre-alignment status (as of 2026-04-27)
 
