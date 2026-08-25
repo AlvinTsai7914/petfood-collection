@@ -54,6 +54,8 @@ export interface ApiProduct {
   nutritionText?: string | null
   // alignment §3.2 B6(2026-05-06 拍板):成分保留字串原樣,後端不拆陣列
   ingredientsText?: string | null
+  // backend-issues #3:live 現況只回拆散的陣列(括號子配方斷裂),normalizer 降級黏回字串
+  ingredients?: string[]
 
   // 結構化營養(後端 parse 後欄位)
   proteinPct?: number | null
@@ -171,6 +173,14 @@ const str = (v: unknown): string | null =>
 const strArr = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0) : []
 
+// backend-issues #3 過渡:live 沒有 ingredientsText,只有被拆散的 ingredients 陣列。
+// 用「、」黏回近似原文讓詳情頁有東西可顯示(括號子配方斷裂為已知瑕疵);
+// 後端補回 ingredientsText 後此 fallback 自動失效。
+const joinIngredients = (v: unknown): string | null => {
+  const arr = strArr(v)
+  return arr.length ? arr.join('、') : null
+}
+
 export const normalizeProduct = (raw: ApiProduct): Product => ({
   id: raw.id,
   title: raw.title,
@@ -185,7 +195,7 @@ export const normalizeProduct = (raw: ApiProduct): Product => ({
   // alignment §3.1 B4:多圖陣列;首張當卡片預覽
   images: strArr(raw.images),
   // alignment §3.2 B6:後端維持字串原樣,前端僅在詳情頁原樣顯示
-  ingredientsText: str(raw.ingredientsText),
+  ingredientsText: str(raw.ingredientsText) ?? joinIngredients(raw.ingredients),
   nutritionText: str(raw.nutritionText),
   isPrescription: Boolean(raw.isPrescription),
   isGrainFree: typeof raw.isGrainFree === 'boolean' ? raw.isGrainFree : null,
@@ -281,12 +291,21 @@ export const useProducts = (
   )
 }
 
-/** 取得單一產品(Phase 1 詳情頁用) */
+/** 跨頁共享的產品暫存 — 列表點卡片時寫入,詳情頁優先取用。
+ *  backend-issues #13 過渡方案:live 後端沒有單筆端點,從列表點進來的導覽
+ *  直接帶列表那筆資料,不再打 API;直接進入/重新整理(暫存是空的)仍走原本 API 路徑。 */
+export const useProductCache = () =>
+  useState<Record<number, Product>>('product-cache', () => ({}))
+
+/** 取得單一產品(Phase 1 詳情頁用);暫存命中則不打 API(#13 過渡) */
 export const useProduct = (id: Ref<string | number> | string | number) => {
   const idRef = isRef(id) ? id : ref(id)
+  const cache = useProductCache()
   return useAsyncData<Product | null>(
     () => `product-${idRef.value}`,
     async () => {
+      const cached = cache.value[Number(idRef.value)]
+      if (cached) return cached
       const res = await $fetch<ApiEnvelope<ApiProduct>>(`/api/products/${idRef.value}`)
       return unwrap(res, normalizeProduct, () => null)
     },

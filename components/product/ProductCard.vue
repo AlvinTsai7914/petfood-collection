@@ -77,6 +77,12 @@ const mobileAllNutrition = computed(() => {
 
 const productCode = computed(() => `PROD-${props.product.id}`)
 
+// 點卡片時把這筆列表資料放進跨頁暫存,詳情頁直接取用(backend-issues #13 過渡)
+const productCache = useProductCache()
+const stashProduct = () => {
+  productCache.value[props.product.id] = props.product
+}
+
 const previewImage = computed(() => props.product.images[0] ?? null)
 
 const imageErrored = ref(false)
@@ -92,6 +98,7 @@ const onImageError = () => {
       :to="`/products/${product.id}`"
       class="absolute inset-0 z-[1]"
       :aria-label="product.title"
+      @click="stashProduct"
     />
     <div class="aspect-[3/1] overflow-hidden bg-neutral-50">
       <img
