@@ -183,7 +183,7 @@ Documentation
 
 **Not yet built:**
 1. SEO basics — `public/robots.txt` + sitemap module + global default `useSeoMeta`
-2. Live-backend cutover — proxy switch exists (`NUXT_LIVE_API=1`) but defaulting to live blocks on backend fixing backend-issues-260515 P0s (#0 intermittent 500s, #13 missing detail endpoint, #3 ingredientsText, plus scope decision on wet food)
+2. Live-backend cutover — proxy switch exists (`NUXT_LIVE_API=1`) but defaulting to live blocks on backend fixing backend-issues-260826 P0s (#0 intermittent 500s, #13 missing detail endpoint; #3 downgraded to display-only per v4 retest, plus scope decision on wet food)
 3. (Spec §17) Website name / per-page meta description / OG image — joint decision pending
 
 ### Responsive Design
